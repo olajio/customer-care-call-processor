@@ -1,0 +1,247 @@
+#!/usr/bin/env python3
+"""
+Test Google Drive access for Customer Care Call Processing System.
+
+This script verifies that the service account can access the designated
+Google Drive folder for call recordings.
+
+Usage:
+    python test_drive_access.py --folder-id YOUR_FOLDER_ID
+    
+    # Or with explicit credentials file:
+    python test_drive_access.py --folder-id YOUR_FOLDER_ID --credentials path/to/key.json
+"""
+import argparse
+import json
+import os
+import sys
+from datetime import datetime
+
+try:
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    from googleapiclient.errors import HttpError
+except ImportError:
+    print("Error: Required packages not installed.")
+    print("Run: pip install google-api-python-client google-auth")
+    sys.exit(1)
+
+
+# Scopes required for Drive API (read-only)
+SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+
+
+def get_credentials(credentials_file: str = None):
+    """Get Google service account credentials from file or environment."""
+    
+    # Check explicit path first
+    if credentials_file and os.path.exists(credentials_file):
+        print(f"Using credentials from: {credentials_file}")
+        return service_account.Credentials.from_service_account_file(
+            credentials_file, scopes=SCOPES
+        )
+    
+    # Try common locations
+    common_paths = [
+        'credentials/service-account-key.json',
+        '../credentials/service-account-key.json',
+        'service-account-key.json',
+        os.path.expanduser('~/.config/google-drive-credentials.json'),
+        os.path.join(os.path.dirname(__file__), '..', 'credentials', 'service-account-key.json')
+    ]
+    
+    for path in common_paths:
+        if os.path.exists(path):
+            print(f"Using credentials from: {path}")
+            return service_account.Credentials.from_service_account_file(
+                path, scopes=SCOPES
+            )
+    
+    # Try environment variable (JSON string)
+    creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
+    if creds_json:
+        print("Using credentials from GOOGLE_CREDENTIALS_JSON environment variable")
+        creds_dict = json.loads(creds_json)
+        return service_account.Credentials.from_service_account_info(
+            creds_dict, scopes=SCOPES
+        )
+    
+    # Try environment variable (file path)
+    creds_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+    if creds_path and os.path.exists(creds_path):
+        print(f"Using credentials from GOOGLE_APPLICATION_CREDENTIALS: {creds_path}")
+        return service_account.Credentials.from_service_account_file(
+            creds_path, scopes=SCOPES
+        )
+    
+    raise FileNotFoundError(
+        "Could not find Google service account credentials.\n"
+        "Options:\n"
+        "  1. Use --credentials flag to specify path\n"
+        "  2. Place credentials in credentials/service-account-key.json\n"
+        "  3. Set GOOGLE_APPLICATION_CREDENTIALS environment variable\n"
+        "  4. Set GOOGLE_CREDENTIALS_JSON environment variable with JSON content"
+    )
+
+
+def test_folder_access(folder_id: str, credentials):
+    """Test access to the specified Google Drive folder."""
+    
+    print(f"\nTesting access to folder: {folder_id}")
+    print("-" * 60)
+    
+    try:
+        # Build Drive service
+        service = build('drive', 'v3', credentials=credentials)
+        
+        # Get folder metadata
+        folder = service.files().get(
+            fileId=folder_id,
+            fields='id, name, mimeType, owners, permissions'
+        ).execute()
+        
+        # Verify it's a folder
+        if folder.get('mimeType') != 'application/vnd.google-apps.folder':
+            print(f"✗ Error: ID {folder_id} is not a folder")
+            print(f"  Type: {folder.get('mimeType')}")
+            return False
+        
+        print(f"✓ Successfully accessed folder: {folder.get('name')}")
+        print(f"  Folder ID: {folder.get('id')}")
+        
+        # List files in folder
+        results = service.files().list(
+            q=f"'{folder_id}' in parents",
+            pageSize=10,
+            fields="files(id, name, mimeType, size, createdTime)"
+        ).execute()
+        
+        files = results.get('files', [])
+        print(f"\n  Files in folder: {len(files)}")
+        
+        if files:
+            print("\n  Recent files:")
+            for f in files[:5]:
+                size = int(f.get('size', 0)) / (1024 * 1024)  # MB
+                print(f"    - {f['name']} ({size:.2f} MB)")
+        
+        # Test audio file detection
+        audio_mimes = [
+            'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav',
+            'audio/mp4', 'audio/x-m4a', 'audio/flac', 'audio/ogg'
+        ]
+        mime_query = " or ".join([f"mimeType='{m}'" for m in audio_mimes])
+        
+        audio_results = service.files().list(
+            q=f"'{folder_id}' in parents and ({mime_query})",
+            pageSize=5,
+            fields="files(id, name, mimeType, size)"
+        ).execute()
+        
+        audio_files = audio_results.get('files', [])
+        print(f"\n  Audio files found: {len(audio_files)}")
+        
+        if audio_files:
+            print("  Ready for processing:")
+            for f in audio_files[:3]:
+                print(f"    ✓ {f['name']}")
+        
+        return True
+        
+    except HttpError as e:
+        if e.resp.status == 404:
+            print(f"✗ Error: Folder not found")
+            print(f"  The folder ID may be incorrect, or the service account")
+            print(f"  doesn't have access to this folder.")
+            print(f"\n  To fix:")
+            print(f"  1. Share the folder with the service account email")
+            print(f"  2. Grant at least 'Viewer' permission")
+        elif e.resp.status == 403:
+            print(f"✗ Error: Access denied")
+            print(f"  The service account doesn't have permission to access this folder.")
+            print(f"\n  To fix:")
+            print(f"  1. Open Google Drive in browser")
+            print(f"  2. Right-click the folder → Share")
+            print(f"  3. Add the service account email with 'Viewer' access")
+        else:
+            print(f"✗ Error accessing folder: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ Unexpected error: {e}")
+        return False
+
+
+def print_service_account_info(credentials):
+    """Print service account information for debugging."""
+    print("\nService Account Information:")
+    print("-" * 60)
+    
+    if hasattr(credentials, 'service_account_email'):
+        print(f"  Email: {credentials.service_account_email}")
+        print(f"\n  ⚠️  Share your Google Drive folder with this email address")
+        print(f"     to grant access to the service account.")
+    else:
+        print("  (Unable to retrieve service account email)")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Test Google Drive access for Customer Care Call Processing System'
+    )
+    parser.add_argument(
+        '--folder-id',
+        required=True,
+        help='Google Drive folder ID to test access'
+    )
+    parser.add_argument(
+        '--credentials',
+        help='Path to service account credentials JSON file'
+    )
+    parser.add_argument(
+        '--verbose',
+        action='store_true',
+        help='Show detailed output'
+    )
+    
+    args = parser.parse_args()
+    
+    print("=" * 60)
+    print("Customer Care Call Processing System - Drive Access Test")
+    print("=" * 60)
+    
+    try:
+        # Get credentials
+        credentials = get_credentials(args.credentials)
+        
+        # Print service account info
+        print_service_account_info(credentials)
+        
+        # Test folder access
+        success = test_folder_access(args.folder_id, credentials)
+        
+        print("\n" + "=" * 60)
+        if success:
+            print("✓ Google Drive access test PASSED")
+            print("\n  Your service account can access the folder.")
+            print("  The webhook integration should work correctly.")
+            print("\n  Next steps:")
+            print("  1. Deploy the infrastructure: ./scripts/deploy.sh")
+            print("  2. Register the webhook: python scripts/register_webhook.py")
+        else:
+            print("✗ Google Drive access test FAILED")
+            print("\n  Please fix the issues above before continuing.")
+            sys.exit(1)
+            
+    except FileNotFoundError as e:
+        print(f"\n✗ Error: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n✗ Unexpected error: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()
