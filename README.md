@@ -83,7 +83,12 @@ This system transforms customer care operations by automating call analysis, red
 ### Prerequisites
 - **AWS Account** with access to Lambda, S3, DynamoDB, Transcribe, Bedrock, Step Functions
 - **Google Cloud Project** with Drive API enabled
-- **Development Tools**: AWS CLI v2, AWS CDK, Python 3.11+, Node.js 18+, Google Cloud SDK
+- **Development Tools**: 
+  - AWS CLI v2
+  - Python 3.11+
+  - Terraform 1.0+
+  - **Google Cloud SDK (gcloud CLI)** - Install: `brew install --cask google-cloud-sdk` (macOS) or [download](https://cloud.google.com/sdk/docs/install)
+  - Node.js 18+ (for frontend)
 - **Credentials**: Google service account with Drive access
 
 ### Implementation Path

@@ -38,12 +38,25 @@ Your quick-start, end-to-end checklist to deploy the AI-powered call transcripti
 - AWS CLI v2 configured with appropriate credentials
 - Python 3.11+
 - Terraform ≥ 1.0
+- Google Cloud SDK (gcloud CLI) - **Required for Google Cloud operations**
 - zip, jq, make
 
 **Google Cloud:**
 - Google Cloud project with Drive API enabled
 - Service Account created with JSON key downloaded
 - OAuth consent screen configured
+
+**Note:** If `gcloud` command is not found, install Google Cloud SDK:
+```bash
+# macOS
+brew install --cask google-cloud-sdk
+
+# Linux
+curl https://sdk.cloud.google.com | bash
+
+# Then initialize
+gcloud init
+```
 
 **📚 Detailed Setup Guide:** See [SETUP_GUIDE.md Section 1: Prerequisites](SETUP_GUIDE.md#1-prerequisites) for:
 - Development tools installation

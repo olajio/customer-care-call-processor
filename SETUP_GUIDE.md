@@ -39,13 +39,79 @@ Install the following tools on your development machine:
 ```bash
 # macOS (using Homebrew)
 brew install node python@3.11 terraform awscli jq
+brew install --cask google-cloud-sdk
 
 # Verify installations
 node --version      # v18+
 python3 --version   # 3.11+
 terraform --version # 1.0+
 aws --version       # 2.x
+gcloud --version    # Google Cloud SDK
 ```
+
+**Alternative Installation Methods for Google Cloud SDK:**
+
+<details>
+<summary>Linux (Debian/Ubuntu)</summary>
+
+```bash
+# Add Cloud SDK distribution URI
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+
+# Import Google Cloud public key
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+
+# Update and install
+sudo apt-get update && sudo apt-get install google-cloud-sdk
+```
+</details>
+
+<details>
+<summary>Linux (Quick Install Script)</summary>
+
+```bash
+curl https://sdk.cloud.google.com | bash
+exec -l $SHELL  # Restart your shell
+```
+</details>
+
+<details>
+<summary>Amazon Linux / RHEL / CentOS</summary>
+
+```bash
+sudo tee -a /etc/yum.repos.d/google-cloud-sdk.repo << EOM
+[google-cloud-cli]
+name=Google Cloud CLI
+baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el8-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+EOM
+
+sudo yum install google-cloud-cli
+```
+</details>
+
+<details>
+<summary>Windows</summary>
+
+```powershell
+# Download and run the installer from:
+# https://cloud.google.com/sdk/docs/install
+
+# Or using Chocolatey:
+choco install gcloudsdk
+```
+</details>
+
+**Initialize Google Cloud SDK:**
+
+```bash
+gcloud init
+```
+
+This will authenticate your account and set up your default project.
 
 ### 1.3 Clone the Repository
 
