@@ -220,7 +220,16 @@ gcloud --version  # Should show Google Cloud SDK version
    - Navigation menu → Billing
    - Link billing account
 
-4. Set the project as your active project:
+4. **Add Environment Tag** (required by Google Cloud):
+   ```bash
+   gcloud resource-manager tags bindings create \
+     --tag-binding=environment=Development \
+     --parent=projects/YOUR_PROJECT_ID
+   ```
+   
+   **Tag Options:** Development, Test, Staging, or Production
+
+5. Set the project as your active project:
    ```bash
    gcloud config set project YOUR_PROJECT_ID
    gcloud config get-value project  # Verify
@@ -230,6 +239,10 @@ gcloud --version  # Should show Google Cloud SDK version
 - Project created and visible in console
 - Project ID noted for later use
 - Billing enabled
+- Environment tag created:
+  ```bash
+  gcloud resource-manager tags bindings list --parent=projects/YOUR_PROJECT_ID
+  ```
 - Project set as active in gcloud CLI
 
 #### Step 1.3: Enable Google Drive API

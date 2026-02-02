@@ -146,8 +146,39 @@ pip install -r requirements.txt
 2. Click "Select a project" → "New Project"
 3. Enter project name: `customer-care-call-processor`
 4. Click "Create"
+5. Note the Project ID (shown on the project details page)
 
-### 2.2 Authenticate with Google Cloud
+### 2.2 Add Environment Tag to Project
+
+**Google Cloud requires projects to have an 'environment' tag for proper resource management.**
+
+After creating the project, add an environment tag:
+
+```bash
+# First, authenticate if you haven't already
+gcloud auth login
+
+# Set your project
+gcloud config set project YOUR_PROJECT_ID
+
+# Create the environment tag (choose one: Development, Test, Staging, or Production)
+gcloud resource-manager tags bindings create \
+  --tag-binding=environment=Development \
+  --parent=projects/YOUR_PROJECT_ID
+```
+
+**Tag Options:**
+- `Development` - Development/testing environments
+- `Test` - QA and testing environments
+- `Staging` - Pre-production staging
+- `Production` - Production environments
+
+**Verify the tag was created:**
+```bash
+gcloud resource-manager tags bindings list --parent=projects/YOUR_PROJECT_ID
+```
+
+### 2.3 Authenticate with Google Cloud
 
 **Before using any gcloud commands, you must authenticate:**
 
@@ -163,10 +194,41 @@ This will:
 
 **Note:** If the browser doesn't open automatically (common on remote systems), copy the URL shown in the terminal and open it manually in a browser.
 
-### 2.3 Set Active Project and Enable APIs
+### 2.4 Add Environment Tag to Project
+
+**Google Cloud requires projects to have an 'environment' tag for proper resource management.**
+
+After creating your project, add an environment tag:
 
 ```bash
-# Set your project (replace YOUR_PROJECT_ID with your actual project ID)
+# Set your project first
+gcloud config set project YOUR_PROJECT_ID
+
+# Create the environment tag (choose one: Development, Test, Staging, or Production)
+gcloud resource-manager tags bindings create \
+  --tag-binding=environment=Development \
+  --parent=projects/YOUR_PROJECT_ID
+```
+
+**Tag Options:**
+- `Development` - Development/testing environments
+- `Test` - QA and testing environments
+- `Staging` - Pre-production staging
+- `Production` - Production environments
+
+**Verify the tag was created:**
+```bash
+gcloud resource-manager tags bindings list --parent=projects/YOUR_PROJECT_ID
+```
+
+**Common Issues:**
+- **Error: "Tag not found"** → The tag may need to be created via Google Cloud Console first
+- **Error: "Permission denied"** → Ensure your account has "Owner" role on the project
+
+### 2.5 Enable Required APIs
+
+```bash
+# Ensure your project is set
 gcloud config set project YOUR_PROJECT_ID
 
 # Verify the correct project is selected
@@ -182,7 +244,7 @@ gcloud services enable serviceusage.googleapis.com
 - **Error: "Project not found"** → Verify the project ID is correct
 - **Error: "Permission denied"** → Ensure your Google account has Owner or Editor role on the project
 
-### 2.4 Create Service Account
+### 2.6 Create Service Account
 
 ```bash
 # Create service account
@@ -192,7 +254,7 @@ gcloud iam service-accounts create call-processor-webhook \
 # Note the email (format: call-processor-webhook@PROJECT_ID.iam.gserviceaccount.com)
 ```
 
-### 2.5 Generate Service Account Key
+### 2.7 Generate Service Account Key
 
 ```bash
 # Generate key file
@@ -202,7 +264,7 @@ gcloud iam service-accounts keys create ./credentials/service-account-key.json \
 
 ⚠️ **Security Warning**: Keep this file secure! Never commit it to version control.
 
-### 2.6 Create and Share Google Drive Folder
+### 2.8 Create and Share Google Drive Folder
 
 1. Go to [Google Drive](https://drive.google.com)
 2. Create a folder: `Customer Call Recordings`
@@ -210,7 +272,7 @@ gcloud iam service-accounts keys create ./credentials/service-account-key.json \
 4. Grant "Editor" permission
 5. Note the folder ID from the URL: `drive.google.com/drive/folders/FOLDER_ID_HERE`
 
-### 2.7 Test Service Account Access
+### 2.9 Test Service Account Access
 
 ```bash
 python scripts/test_drive_access.py --folder-id YOUR_FOLDER_ID

@@ -526,6 +526,24 @@ Google Cloud projects are containers that organize your cloud resources. Think o
    - Ensure the new project is selected in the project dropdown
    - The dashboard should show your project name
 
+6. **Add Environment Tag to Project** (required by Google Cloud)
+   - After project creation, you must add an environment tag
+   - Use the CLI (easier than console):
+   ```bash
+   gcloud config set project gdrive-s3-pipeline-XXXXX  # Use your project ID
+   
+   # Create the environment tag (choose: Development, Test, Staging, or Production)
+   gcloud resource-manager tags bindings create \
+     --tag-binding=environment=Development \
+     --parent=projects/gdrive-s3-pipeline-XXXXX
+   ```
+   
+   **Tag Options:**
+   - `Development` - Development/testing environments
+   - `Test` - QA and testing environments
+   - `Staging` - Pre-production staging
+   - `Production` - Production environments
+
 ✓ **Verification:** 
 ```bash
 # First, authenticate if you haven't already
@@ -536,6 +554,9 @@ gcloud config set project gdrive-s3-pipeline-XXXXX  # Use your actual project ID
 
 # Verify project exists
 gcloud projects describe gdrive-s3-pipeline-XXXXX
+
+# Verify tag was created
+gcloud resource-manager tags bindings list --parent=projects/gdrive-s3-pipeline-XXXXX
 ```
 
 **Note:** If you get "You do not currently have an active account selected", run `gcloud auth login` first.

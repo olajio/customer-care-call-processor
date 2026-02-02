@@ -118,12 +118,20 @@ cd customer-care-call-processor
    gcloud config set project customer-care-processor
    ```
 
-3. **Enable Google Drive API**:
+3. **Add Environment Tag** (required by Google Cloud):
+   ```bash
+   # Choose tag value: Development, Test, Staging, or Production
+   gcloud resource-manager tags bindings create \
+     --tag-binding=environment=Development \
+     --parent=projects/customer-care-processor
+   ```
+
+4. **Enable Google Drive API**:
    ```bash
    gcloud services enable drive.googleapis.com
    ```
 
-4. **Create Service Account**:
+5. **Create Service Account**:
    ```bash
    gcloud iam service-accounts create call-processor-sa \
        --display-name="Call Processor Service Account"
@@ -132,7 +140,7 @@ cd customer-care-call-processor
        --iam-account=call-processor-sa@YOUR_PROJECT.iam.gserviceaccount.com
    ```
 
-5. **Share Google Drive folder** with the service account email as **Viewer**.
+6. **Share Google Drive folder** with the service account email as **Viewer**.
 
 5. **Store credentials in AWS Secrets Manager**:
    ```bash
