@@ -111,7 +111,15 @@ choco install gcloudsdk
 gcloud init
 ```
 
-This will authenticate your account and set up your default project.
+This will:
+1. Authenticate your account (opens browser for sign-in)
+2. Set up your default project
+3. Configure default compute region/zone
+
+**Alternative:** You can also authenticate separately with:
+```bash
+gcloud auth login  # Just authenticate without full initialization
+```
 
 ### 1.3 Clone the Repository
 
@@ -139,18 +147,42 @@ pip install -r requirements.txt
 3. Enter project name: `customer-care-call-processor`
 4. Click "Create"
 
-### 2.2 Enable Required APIs
+### 2.2 Authenticate with Google Cloud
+
+**Before using any gcloud commands, you must authenticate:**
 
 ```bash
-# Set your project
+# Authenticate with your Google account
+gcloud auth login
+```
+
+This will:
+1. Open a browser window for you to sign in with your Google account
+2. Grant the gcloud CLI permission to access your Google Cloud resources
+3. Save your credentials locally for future use
+
+**Note:** If the browser doesn't open automatically (common on remote systems), copy the URL shown in the terminal and open it manually in a browser.
+
+### 2.3 Set Active Project and Enable APIs
+
+```bash
+# Set your project (replace YOUR_PROJECT_ID with your actual project ID)
 gcloud config set project YOUR_PROJECT_ID
 
-# Enable APIs
+# Verify the correct project is selected
+gcloud config get-value project
+
+# Enable required APIs
 gcloud services enable drive.googleapis.com
 gcloud services enable serviceusage.googleapis.com
 ```
 
-### 2.3 Create Service Account
+**Common Issues:**
+- **Error: "You do not currently have an active account selected"** → Run `gcloud auth login` first
+- **Error: "Project not found"** → Verify the project ID is correct
+- **Error: "Permission denied"** → Ensure your Google account has Owner or Editor role on the project
+
+### 2.4 Create Service Account
 
 ```bash
 # Create service account
@@ -160,7 +192,7 @@ gcloud iam service-accounts create call-processor-webhook \
 # Note the email (format: call-processor-webhook@PROJECT_ID.iam.gserviceaccount.com)
 ```
 
-### 2.4 Generate Service Account Key
+### 2.5 Generate Service Account Key
 
 ```bash
 # Generate key file
@@ -170,7 +202,7 @@ gcloud iam service-accounts keys create ./credentials/service-account-key.json \
 
 ⚠️ **Security Warning**: Keep this file secure! Never commit it to version control.
 
-### 2.5 Create and Share Google Drive Folder
+### 2.6 Create and Share Google Drive Folder
 
 1. Go to [Google Drive](https://drive.google.com)
 2. Create a folder: `Customer Call Recordings`
@@ -178,7 +210,7 @@ gcloud iam service-accounts keys create ./credentials/service-account-key.json \
 4. Grant "Editor" permission
 5. Note the folder ID from the URL: `drive.google.com/drive/folders/FOLDER_ID_HERE`
 
-### 2.6 Test Service Account Access
+### 2.7 Test Service Account Access
 
 ```bash
 python scripts/test_drive_access.py --folder-id YOUR_FOLDER_ID

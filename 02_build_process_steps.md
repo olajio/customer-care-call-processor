@@ -186,7 +186,28 @@ gcloud --version  # Should show Google Cloud SDK version
 
 ### Steps
 
-#### Step 1.1: Create Google Cloud Project
+#### Step 1.1: Authenticate with Google Cloud (Required First)
+**Tasks:**
+1. Open terminal and authenticate with Google Cloud:
+   ```bash
+   gcloud auth login
+   ```
+   This will open a browser window for you to sign in with your Google account.
+
+2. Verify authentication:
+   ```bash
+   gcloud auth list  # Shows authenticated accounts
+   ```
+
+**Validation:**
+- Your Google account email appears in the authenticated accounts list
+- Account shows as active (indicated by asterisk *)
+
+**Troubleshooting:**
+- If browser doesn't open, copy the URL from terminal and open manually
+- If running on remote system, use `gcloud auth login --no-browser` and follow instructions
+
+#### Step 1.2: Create Google Cloud Project
 **Tasks:**
 1. Log in to [Google Cloud Console](https://console.cloud.google.com)
 
@@ -199,12 +220,19 @@ gcloud --version  # Should show Google Cloud SDK version
    - Navigation menu → Billing
    - Link billing account
 
+4. Set the project as your active project:
+   ```bash
+   gcloud config set project YOUR_PROJECT_ID
+   gcloud config get-value project  # Verify
+   ```
+
 **Validation:**
 - Project created and visible in console
 - Project ID noted for later use
 - Billing enabled
+- Project set as active in gcloud CLI
 
-#### Step 1.2: Enable Google Drive API
+#### Step 1.3: Enable Google Drive API
 **Tasks:**
 1. In Google Cloud Console, navigate to "APIs & Services" → "Library"
 
@@ -214,11 +242,17 @@ gcloud --version  # Should show Google Cloud SDK version
 
 4. Wait for API enablement (usually immediate)
 
+5. Enable via CLI (alternative method):
+   ```bash
+   gcloud services enable drive.googleapis.com
+   ```
+
 **Validation:**
 - Navigate to "APIs & Services" → "Dashboard"
 - Confirm "Google Drive API" shows as enabled
+- Or verify via CLI: `gcloud services list --enabled --filter="name:drive.googleapis.com"`
 
-#### Step 1.3: Create Service Account
+#### Step 1.4: Create Service Account
 **Tasks:**
 1. Navigate to "IAM & Admin" → "Service Accounts"
 
@@ -238,7 +272,7 @@ gcloud --version  # Should show Google Cloud SDK version
 - Service account appears in list
 - Note the service account email (e.g., `customer-care-drive-reader@customer-care-audio-123456.iam.gserviceaccount.com`)
 
-#### Step 1.4: Generate Service Account Key
+#### Step 1.5: Generate Service Account Key
 **Tasks:**
 1. Click on the service account you just created
 

@@ -107,18 +107,23 @@ cd customer-care-call-processor
 
 **Quick Steps:**
 
-1. **Create Google Cloud Project** (if needed):
+1. **Authenticate with Google Cloud** (required first):
+   ```bash
+   gcloud auth login  # Opens browser for authentication
+   ```
+
+2. **Create Google Cloud Project** (if needed):
    ```bash
    gcloud projects create customer-care-processor --name="Call Processor"
    gcloud config set project customer-care-processor
    ```
 
-2. **Enable Google Drive API**:
+3. **Enable Google Drive API**:
    ```bash
    gcloud services enable drive.googleapis.com
    ```
 
-3. **Create Service Account**:
+4. **Create Service Account**:
    ```bash
    gcloud iam service-accounts create call-processor-sa \
        --display-name="Call Processor Service Account"
@@ -127,7 +132,7 @@ cd customer-care-call-processor
        --iam-account=call-processor-sa@YOUR_PROJECT.iam.gserviceaccount.com
    ```
 
-4. **Share Google Drive folder** with the service account email as **Viewer**.
+5. **Share Google Drive folder** with the service account email as **Viewer**.
 
 5. **Store credentials in AWS Secrets Manager**:
    ```bash
