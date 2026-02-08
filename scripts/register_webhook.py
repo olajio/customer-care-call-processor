@@ -39,12 +39,9 @@ def get_credentials(credentials_file: str = None) -> service_account.Credentials
             credentials_file, scopes=SCOPES
         )
     
-    # Try common locations
+    # Try the standard local credentials location
     common_paths = [
-        'credentials/service-account-key.json',
-        '../credentials/service-account-key.json',
-        'service-account-key.json',
-        os.path.expanduser('~/.config/google-drive-credentials.json')
+        os.path.expanduser('~/.config/customer-care-call-processor/service-account-key.json')
     ]
     
     for path in common_paths:
@@ -64,7 +61,8 @@ def get_credentials(credentials_file: str = None) -> service_account.Credentials
     
     raise FileNotFoundError(
         "Could not find Google service account credentials. "
-        "Specify with --credentials-file or place in credentials/service-account-key.json"
+        "Specify with --credentials-file or store at "
+        "~/.config/customer-care-call-processor/service-account-key.json"
     )
 
 

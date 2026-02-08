@@ -116,7 +116,7 @@ output "deployment_instructions" {
     
     aws secretsmanager create-secret \
       --name ${var.google_credentials_secret_name} \
-      --secret-string file://path/to/service-account-key.json
+      --secret-string file://~/.config/customer-care-call-processor/service-account-key.json
     
     ═══════════════════════════════════════════════════════════════════
     STEP 2: Generate and Store Webhook Token

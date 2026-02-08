@@ -9,7 +9,8 @@ Usage:
     python test_drive_access.py --folder-id YOUR_FOLDER_ID
     
     # Or with explicit credentials file:
-    python test_drive_access.py --folder-id YOUR_FOLDER_ID --credentials path/to/key.json
+    python test_drive_access.py --folder-id YOUR_FOLDER_ID \
+      --credentials ~/.config/customer-care-call-processor/service-account-key.json
 """
 import argparse
 import json
@@ -44,13 +45,9 @@ def get_credentials(credentials_file: str = None):
     if credentials_file:
         print(f"Warning: Specified credentials file not found: {credentials_file}")
     
-    # Try common locations
+    # Try the standard local credentials location
     common_paths = [
-        'credentials/service-account-key.json',
-        '../credentials/service-account-key.json',
-        'service-account-key.json',
-        os.path.expanduser('~/.config/google-drive-credentials.json'),
-        os.path.join(os.path.dirname(__file__), '..', 'credentials', 'service-account-key.json')
+        os.path.expanduser('~/.config/customer-care-call-processor/service-account-key.json')
     ]
     
     for path in common_paths:

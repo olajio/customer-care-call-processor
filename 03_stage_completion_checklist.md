@@ -94,14 +94,15 @@ This document provides detailed validation steps to confirm successful completio
 - [ ] Service account email appears in folder's "Share" settings
 
 #### Access Testing
-- [ ] Test script (`test_google_drive.py`) created
+- [ ] Test script (`scripts/test_drive_access.py`) executed
 - [ ] Required Python packages installed: `google-auth`, `google-api-python-client`
 - [ ] Test script executes without errors
 - [ ] Test script successfully lists files in folder (or shows 0 files)
 - [ ] Test file uploaded to folder is visible via API
 
 ### 🔒 Security Checklist
-- [ ] Service account key stored in secure location (NOT in git)
+- [ ] Service account key stored at `~/.config/customer-care-call-processor/service-account-key.json`
+- [ ] Service account key permissions set to read-only: `chmod 400 ~/.config/customer-care-call-processor/service-account-key.json`
 - [ ] Service account has minimal permissions (Viewer only)
 - [ ] Folder shared only with service account (not public)
 

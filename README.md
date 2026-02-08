@@ -351,7 +351,8 @@ WEBSOCKET_ENDPOINT = "wss://ws.yourdomain.com"
 
 ```bash
 # Run the provided test script
-python test_google_drive.py
+python scripts/test_drive_access.py --folder-id YOUR_FOLDER_ID
+# Optional: --credentials ~/.config/customer-care-call-processor/service-account-key.json
 ```
 
 ### Monitor Processing

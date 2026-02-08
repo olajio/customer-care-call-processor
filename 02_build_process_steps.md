@@ -307,12 +307,17 @@ gcloud --version  # Should show Google Cloud SDK version
 
 5. Click "Create"
 
-6. Save the downloaded JSON file securely (e.g., `google-service-account-key.json`)
+6. Move the downloaded JSON file to the standard secure location:
+   ```bash
+   mkdir -p ~/.config/customer-care-call-processor
+   mv ~/Downloads/*.json ~/.config/customer-care-call-processor/service-account-key.json
+   chmod 400 ~/.config/customer-care-call-processor/service-account-key.json
+   ```
 
 **⚠️ SECURITY WARNING:**
 - This JSON file contains credentials that provide access to Google Drive
 - Never commit this file to version control
-- Store in a secure location (will upload to AWS Secrets Manager later)
+- Store outside the repo in `~/.config/customer-care-call-processor/` and keep it read-only to reduce accidental edits
 
 **Validation:**
 - JSON file downloaded
@@ -349,45 +354,15 @@ gcloud --version  # Should show Google Cloud SDK version
 
 #### Step 1.6: Test Service Account Access
 **Tasks:**
-1. Create test script `test_google_drive.py`:
-   ```python
-   from google.oauth2 import service_account
-   from googleapiclient.discovery import build
-   
-   # Path to your service account key file
-   SERVICE_ACCOUNT_FILE = 'google-service-account-key.json'
-   FOLDER_ID = 'YOUR_FOLDER_ID_HERE'
-   
-   # Authenticate
-   credentials = service_account.Credentials.from_service_account_file(
-       SERVICE_ACCOUNT_FILE,
-       scopes=['https://www.googleapis.com/auth/drive.readonly']
-   )
-   
-   # Build Drive API client
-   service = build('drive', 'v3', credentials=credentials)
-   
-   # List files in folder
-   results = service.files().list(
-       q=f"'{FOLDER_ID}' in parents",
-       pageSize=10,
-       fields="files(id, name, mimeType, size)"
-   ).execute()
-   
-   files = results.get('files', [])
-   print(f"Found {len(files)} files:")
-   for file in files:
-       print(f"  - {file['name']} ({file['mimeType']})")
-   ```
-
-2. Install required Python package:
+1. Install required Python package:
    ```bash
    pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
    ```
 
-3. Run test script:
+2. Run test script:
    ```bash
-   python test_google_drive.py
+   python scripts/test_drive_access.py --folder-id YOUR_FOLDER_ID
+   # Optional: --credentials ~/.config/customer-care-call-processor/service-account-key.json
    ```
 
 **Validation:**
@@ -753,7 +728,7 @@ aws dynamodb list-tables --profile customer-care-dev
    aws secretsmanager create-secret \
      --name customer-care/google-service-account \
      --description "Google Drive service account credentials" \
-     --secret-string file://google-service-account-key.json \
+       --secret-string file://~/.config/customer-care-call-processor/service-account-key.json \
      --profile customer-care-dev
    ```
 
@@ -987,7 +962,7 @@ curl -X POST https://abc123.execute-api.us-east-1.amazonaws.com/prod/webhook/gdr
    from googleapiclient.discovery import build
    import uuid
    
-   SERVICE_ACCOUNT_FILE = 'google-service-account-key.json'
+   SERVICE_ACCOUNT_FILE = '~/.config/customer-care-call-processor/service-account-key.json'
    FOLDER_ID = 'YOUR_FOLDER_ID'
    WEBHOOK_URL = 'https://abc123.execute-api.us-east-1.amazonaws.com/prod/webhook/gdrive'
    WEBHOOK_TOKEN = 'YOUR_WEBHOOK_TOKEN'

@@ -698,11 +698,12 @@ The service account key is a JSON file containing credentials that allow your ap
    - **Default filename:** `gdrive-s3-pipeline-XXXXX-xxxxxxxxx.json`
    - **Move it immediately to a secure location:**
      ```bash
-     # Move to your project directory (which is in .gitignore)
-     mv ~/Downloads/gdrive-s3-pipeline-*.json ~/customer-care-call-processor/service-account-key.json
+     # Store outside the repo in a dedicated config directory
+     mkdir -p ~/.config/customer-care-call-processor
+     mv ~/Downloads/gdrive-s3-pipeline-*.json ~/.config/customer-care-call-processor/service-account-key.json
      
-     # Set restrictive permissions
-     chmod 600 ~/customer-care-call-processor/service-account-key.json
+     # Make the file read-only for your user
+     chmod 400 ~/.config/customer-care-call-processor/service-account-key.json
      ```
 
 ⚠️ **CRITICAL SECURITY WARNINGS:**
@@ -714,8 +715,8 @@ The service account key is a JSON file containing credentials that allow your ap
    # Should output: *service-account*.json
    
    # Double-check it won't be committed
-   git status --ignored | grep service-account-key.json
-   # Should show: service-account-key.json (if in ignored list)
+  git status --ignored | grep service-account-key.json
+  # If you ever store it in the repo (not recommended), it should be ignored
    ```
 
 2. **This key grants full access** to anything the service account can access. Treat it like a password!
@@ -732,14 +733,14 @@ The service account key is a JSON file containing credentials that allow your ap
    aws secretsmanager create-secret \
      --name google-drive-service-account \
      --description "Service account key for Google Drive API access" \
-     --secret-string file://service-account-key.json \
+  --secret-string file://~/.config/customer-care-call-processor/service-account-key.json \
      --region us-east-1
    
    # Verify it's stored
    aws secretsmanager describe-secret --secret-id google-drive-service-account
    
-   # Now you can delete the local file (optional but recommended)
-   # rm service-account-key.json
+  # Now you can delete the local file (optional but recommended)
+  # rm ~/.config/customer-care-call-processor/service-account-key.json
    ```
 
 💡 **Best Practice:** In production, never store this key in Lambda function code or environment variables. Always use AWS Secrets Manager or Parameter Store.
@@ -747,7 +748,7 @@ The service account key is a JSON file containing credentials that allow your ap
 ✓ **Verification:**
 ```bash
 # Verify the JSON key structure
-cat service-account-key.json | python3 -m json.tool | head -n 10
+cat ~/.config/customer-care-call-processor/service-account-key.json | python3 -m json.tool | head -n 10
 
 # Expected fields:
 # - "type": "service_account"
@@ -845,7 +846,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 # Configuration
-SERVICE_ACCOUNT_FILE = 'service-account-key.json'  # Path to your key file
+SERVICE_ACCOUNT_FILE = '~/.config/customer-care-call-processor/service-account-key.json'  # Path to your key file
 FOLDER_ID = 'REPLACE_WITH_YOUR_FOLDER_ID'  # Replace with your folder ID
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
@@ -1063,8 +1064,8 @@ Next steps:
 5. **Troubleshooting Failed Tests**
 
 If TEST 1 fails:
-- Verify the service account key file exists: `ls -la service-account-key.json`
-- Check file permissions: `chmod 600 service-account-key.json`
+- Verify the service account key file exists: `ls -la ~/.config/customer-care-call-processor/service-account-key.json`
+- Check file permissions: `chmod 400 ~/.config/customer-care-call-processor/service-account-key.json`
 
 If TEST 2 fails:
 - Verify Google Drive API is enabled in GCP Console
@@ -1094,7 +1095,7 @@ Now that everything is tested and working, let's store configuration securely in
 aws secretsmanager create-secret \
   --name google-drive-service-account \
   --description "Google Drive service account key for webhook pipeline" \
-  --secret-string file://service-account-key.json \
+  --secret-string file://~/.config/customer-care-call-processor/service-account-key.json \
   --region us-east-1
 
 # Store pipeline configuration
@@ -1112,7 +1113,7 @@ aws secretsmanager create-secret \
 aws secretsmanager list-secrets --region us-east-1 | grep gdrive
 ```
 
-💡 **Security Best Practice:** Now that secrets are in AWS Secrets Manager, you can optionally delete the local `service-account-key.json` file. Your Lambda functions will retrieve it from Secrets Manager.
+💡 **Security Best Practice:** Now that secrets are in AWS Secrets Manager, you can optionally delete the local `~/.config/customer-care-call-processor/service-account-key.json` file. Your Lambda functions will retrieve it from Secrets Manager.
 
 ✓ **Section 3 Complete!** You've successfully:
 - ✓ Created a Google Cloud project
@@ -1901,7 +1902,7 @@ This section covers common problems you might encounter and their solutions.
 4. **Verify service account email:**
    ```bash
    # Check service account email
-   cat service-account-key.json | grep client_email
+  cat ~/.config/customer-care-call-processor/service-account-key.json | grep client_email
    # Should match the email you shared the folder with
    ```
 
@@ -2261,13 +2262,13 @@ This section covers common problems you might encounter and their solutions.
 **Solutions:**
 1. **Verify file exists:**
    ```bash
-   ls -la service-account-key.json
+  ls -la ~/.config/customer-care-call-processor/service-account-key.json
    ```
 
 2. **Check file path in script:**
    ```python
    # Make sure path is correct relative to where you run the script
-   SERVICE_ACCOUNT_FILE = 'service-account-key.json'  # Or full path
+  SERVICE_ACCOUNT_FILE = '~/.config/customer-care-call-processor/service-account-key.json'  # Or full path
    ```
 
 3. **Run from project root:**

@@ -281,12 +281,17 @@ gcloud iam service-accounts create call-processor-webhook \
 ### 2.6 Generate Service Account Key
 
 ```bash
-# Generate key file
-gcloud iam service-accounts keys create ./credentials/service-account-key.json \
+# Create a secure local directory and generate the key file
+mkdir -p ~/.config/customer-care-call-processor
+gcloud iam service-accounts keys create ~/.config/customer-care-call-processor/service-account-key.json \
   --iam-account=call-processor-webhook@YOUR_PROJECT_ID.iam.gserviceaccount.com
+
+# Make the file read-only for your user
+chmod 400 ~/.config/customer-care-call-processor/service-account-key.json
 ```
 
 ⚠️ **Security Warning**: Keep this file secure! Never commit it to version control.
+**Why this location?** Storing the key under `~/.config/customer-care-call-processor/` keeps it outside the repo (prevents accidental commits) and allows strict file permissions. The `chmod 400` setting makes the key read-only to reduce the risk of accidental edits.
 
 ### 2.7 Create and Share Google Drive Folder
 
@@ -399,7 +404,7 @@ terraform output -json > ../config/terraform-outputs.json
 ```bash
 aws secretsmanager create-secret \
   --name google-drive-credentials \
-  --secret-string file://../credentials/service-account-key.json
+  --secret-string file://~/.config/customer-care-call-processor/service-account-key.json
 ```
 
 ### 5.2 Generate and Store Webhook Token

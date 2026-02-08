@@ -13,22 +13,23 @@ echo "===================================="
 echo ""
 
 # Check for service account key file
+DEFAULT_KEY_PATH="$HOME/.config/customer-care-call-processor/service-account-key.json"
 if [ -z "$1" ]; then
-    echo -e "${RED}Error: Service account key file required${NC}"
-    echo "Usage: $0 <path-to-service-account-key.json>"
+    SERVICE_ACCOUNT_KEY="$DEFAULT_KEY_PATH"
+else
+    SERVICE_ACCOUNT_KEY="$1"
+fi
+
+if [ ! -f "$SERVICE_ACCOUNT_KEY" ]; then
+    echo -e "${RED}Error: Service account key file not found${NC}"
+    echo "Expected at: $DEFAULT_KEY_PATH"
+    echo "Or provide a path: $0 <path-to-service-account-key.json>"
     echo ""
     echo "To create a service account:"
     echo "1. Go to https://console.cloud.google.com/iam-admin/serviceaccounts"
     echo "2. Create a new service account"
     echo "3. Grant it 'Viewer' role"
     echo "4. Create and download JSON key"
-    exit 1
-fi
-
-SERVICE_ACCOUNT_KEY="$1"
-
-if [ ! -f "$SERVICE_ACCOUNT_KEY" ]; then
-    echo -e "${RED}Error: File not found: $SERVICE_ACCOUNT_KEY${NC}"
     exit 1
 fi
 
