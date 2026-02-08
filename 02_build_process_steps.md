@@ -398,26 +398,46 @@ gcloud --version  # Should show Google Cloud SDK version
    - Set up root user MFA (required)
 
 2. Bootstrap IAM deployer user and group with Terraform (use existing admin/root/SSO credentials for this one-time step):
-   ```bash
-   cd terraform
-   terraform init
-   terraform apply \
-     -target=aws_iam_user.deployer \
-     -target=aws_iam_group.deployer \
-     -target=aws_iam_group_policy_attachment.deployer_policy \
-     -target=aws_iam_user_group_membership.deployer_membership \
-     -target=aws_iam_access_key.deployer
-   ```
+2. Create IAM policy, group, and user in AWS Console:
+    - **Policy name:** `customer-care-deployer-policy`
+    - **Group name:** `customer-care-deployer-group`
+    - **User name:** `customer-care-deployer` (programmatic access)
 
-   **Policy coverage:** IAM, S3, DynamoDB, Lambda, API Gateway, Cognito, Step Functions, Secrets Manager, CloudWatch/Logs, SNS, X-Ray, Bedrock, Transcribe, Events, and tagging.
+    **Policy JSON:**
+    ```json
+    {
+       "Version": "2012-10-17",
+       "Statement": [
+          {
+             "Effect": "Allow",
+             "Action": [
+                "iam:*",
+                "s3:*",
+                "dynamodb:*",
+                "lambda:*",
+                "apigateway:*",
+                "apigatewayv2:*",
+                "cognito-idp:*",
+                "logs:*",
+                "cloudwatch:*",
+                "sns:*",
+                "secretsmanager:*",
+                "states:*",
+                "events:*",
+                "xray:*",
+                "tag:*",
+                "resource-groups:*",
+                "bedrock:*",
+                "transcribe:*",
+                "sts:GetCallerIdentity"
+             ],
+             "Resource": "*"
+          }
+       ]
+    }
+    ```
 
-3. Capture the deployer access keys (store securely):
-   ```bash
-   terraform output -raw deployer_access_key_id
-   terraform output -raw deployer_secret_access_key
-   ```
-
-4. Configure AWS CLI:
+3. Configure AWS CLI:
    ```bash
    aws configure --profile customer-care-dev
    # AWS Access Key ID: [Deployer access key]
@@ -426,7 +446,7 @@ gcloud --version  # Should show Google Cloud SDK version
    # Default output format: json
    ```
 
-5. Set environment variable:
+4. Set environment variable:
    ```bash
    export AWS_PROFILE=customer-care-dev
    # Add to ~/.bashrc or ~/.zshrc for persistence

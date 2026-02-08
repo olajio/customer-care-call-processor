@@ -313,35 +313,58 @@ Expected output: `✓ Successfully accessed folder: Customer Call Recordings`
 
 ## 3. AWS Setup
 
-### 3.1 Create Terraform Deployer User (Bootstrap)
+### 3.1 Create IAM Group, Policy, and User (AWS Console)
 
-Use existing admin/root/SSO credentials to run a one-time Terraform bootstrap that creates a dedicated deployer IAM user and group with the required permissions.
+Create a dedicated IAM group and user in the AWS Console so credentials are stable and not recreated on every Terraform apply.
 
-1. Add these variables to `terraform/terraform.tfvars`:
-  ```hcl
-  deployer_user_name  = "customer-care-deployer"
-  deployer_group_name = "customer-care-deployer-group"
-  ```
+1. **Create IAM policy**
+   - Go to **IAM → Policies → Create policy → JSON**
+   - Paste the policy below, then create it as `customer-care-deployer-policy`.
 
-2. Run the bootstrap apply (targets only the IAM deployer resources):
-  ```bash
-  cd terraform
-  terraform init
-  terraform apply \
-    -target=aws_iam_user.deployer \
-    -target=aws_iam_group.deployer \
-    -target=aws_iam_group_policy_attachment.deployer_policy \
-    -target=aws_iam_user_group_membership.deployer_membership \
-    -target=aws_iam_access_key.deployer
-  ```
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": [
+           "iam:*",
+           "s3:*",
+           "dynamodb:*",
+           "lambda:*",
+           "apigateway:*",
+           "apigatewayv2:*",
+           "cognito-idp:*",
+           "logs:*",
+           "cloudwatch:*",
+           "sns:*",
+           "secretsmanager:*",
+           "states:*",
+           "events:*",
+           "xray:*",
+           "tag:*",
+           "resource-groups:*",
+           "bedrock:*",
+           "transcribe:*",
+           "sts:GetCallerIdentity"
+         ],
+         "Resource": "*"
+       }
+     ]
+   }
+   ```
 
-  **Policy coverage:** The deployer policy grants the permissions needed to provision and operate this stack (IAM, S3, DynamoDB, Lambda, API Gateway, Cognito, Step Functions, Secrets Manager, CloudWatch/Logs, SNS, X-Ray, Bedrock, Transcribe, Events, and resource tagging).
+2. **Create IAM group**
+   - Go to **IAM → Groups → Create group**
+   - Group name: `customer-care-deployer-group`
+   - Attach the policy `customer-care-deployer-policy`
 
-3. Capture the access keys (store securely):
-  ```bash
-  terraform output -raw deployer_access_key_id
-  terraform output -raw deployer_secret_access_key
-  ```
+3. **Create IAM user**
+   - Go to **IAM → Users → Create user**
+   - User name: `customer-care-deployer`
+   - Access type: **Programmatic access**
+   - Add user to group: `customer-care-deployer-group`
+   - Download the access key and secret access key
 
 ### 3.2 Configure AWS CLI
 
@@ -382,9 +405,6 @@ environment    = "dev"
 s3_bucket_name = "customer-care-call-processor-dev"
 gdrive_folder_id = "YOUR_GOOGLE_DRIVE_FOLDER_ID"
 
-# Optional (IAM deployer user/group)
-deployer_user_name  = "customer-care-deployer"
-deployer_group_name = "customer-care-deployer-group"
 
 # Optional: Email for alerts
 alert_email = "your-email@example.com"

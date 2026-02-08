@@ -126,7 +126,7 @@ This document provides detailed validation steps to confirm successful completio
 #### AWS Account Configuration
 - [ ] AWS account accessible
 - [ ] Root user MFA enabled
-- [ ] IAM deployer group and user created via Terraform
+- [ ] IAM deployer group and user created in AWS Console
 - [ ] Deployer policy attached with required permissions
 - [ ] Deployer access key generated and stored securely
 

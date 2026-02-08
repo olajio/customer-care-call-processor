@@ -152,7 +152,7 @@ aws --version  # Should show aws-cli/2.x.x
 
 **Configure AWS Credentials:**
 ```bash
-# Use the deployer IAM user created by Terraform (see SETUP_GUIDE Section 3)
+# Use the deployer IAM user created in the AWS Console (see SETUP_GUIDE Section 3)
 aws configure --profile customer-care-dev
 
 # You'll be prompted for:
