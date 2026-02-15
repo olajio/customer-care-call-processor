@@ -58,6 +58,33 @@ If you plan to use the Bedrock summarization Lambda, you must enable model acces
 2. Go to **Model access**.
 3. Request/enable access to the model family you will call (Terraform defaults to Claude: `anthropic.claude-3-5-sonnet-*`).
 
+### 0.6 Test as you go (unit tests + smoke tests)
+You can test this system at two levels:
+
+1) **Unit tests (local, fast)**
+- These run on your laptop and validate the Python logic without deploying AWS infrastructure.
+- They live under [tests](tests) and run with `pytest`.
+
+2) **Smoke/integration checks (AWS, slower)**
+- These verify the AWS resources are created correctly and can be called.
+- For infrastructure (S3/DynamoDB/IAM/API Gateway), AWS CLI checks are more realistic than “unit tests”.
+
+Local unit test setup (recommended):
+1. Create/activate a virtual environment.
+2. Install dependencies:
+   - `pip install -r requirements.txt`
+3. Run unit tests:
+   - `pytest -m "not integration" -v`
+
+Useful test files:
+- Webhook handler: [tests/test_webhook_handler.py](tests/test_webhook_handler.py)
+- Transcribe + processing: [tests/test_processing.py](tests/test_processing.py)
+- API handlers: [tests/test_api.py](tests/test_api.py)
+
+If you want to run AWS integration tests (only after deploying resources):
+- Some integration tests are gated by environment variables (example: `RUN_INTEGRATION_TESTS=true`).
+- Start with the AWS CLI “smoke tests” in each section below before running integration test suites.
+
 ---
 
 ## 1) Create S3 Buckets
@@ -131,6 +158,25 @@ Terraform creates a logs bucket only for `prod`.
 7. Prefix: `s3-access-logs/`.
 8. Save.
 
+### 1.5 Test / verify S3
+AWS CLI smoke tests (replace values from your worksheet):
+1. Confirm bucket exists:
+   - `aws s3api head-bucket --bucket <s3_bucket_name>`
+2. Confirm encryption is enabled:
+   - `aws s3api get-bucket-encryption --bucket <s3_bucket_name>`
+3. Confirm public access block:
+   - `aws s3api get-public-access-block --bucket <s3_bucket_name>`
+4. Confirm CORS (dev only):
+   - `aws s3api get-bucket-cors --bucket <s3_bucket_name>`
+5. Confirm lifecycle rules:
+   - `aws s3api get-bucket-lifecycle-configuration --bucket <s3_bucket_name>`
+6. Upload + download a test object:
+   - `echo "hello" > /tmp/s3-test.txt`
+   - `aws s3 cp /tmp/s3-test.txt s3://<s3_bucket_name>/test/s3-test.txt`
+   - `aws s3 cp s3://<s3_bucket_name>/test/s3-test.txt /tmp/s3-test-downloaded.txt`
+   - `diff /tmp/s3-test.txt /tmp/s3-test-downloaded.txt`
+   - Cleanup: `aws s3 rm s3://<s3_bucket_name>/test/s3-test.txt`
+
 ---
 
 ## 2) Create DynamoDB Tables (3)
@@ -198,6 +244,20 @@ Create GSI: `folder-index`
 Enable TTL
 1. Enable TTL using attribute name `ttl`.
 
+### 2.4 Test / verify DynamoDB
+AWS CLI smoke tests:
+1. Confirm tables exist:
+   - `aws dynamodb describe-table --table-name ${project_name}-summaries-${environment}`
+   - `aws dynamodb describe-table --table-name ${project_name}-connections-${environment}`
+   - `aws dynamodb describe-table --table-name ${project_name}-channels-${environment}`
+2. Confirm required GSIs:
+   - In each `describe-table` output, look for `GlobalSecondaryIndexes`.
+3. Put/get a test item in the summaries table:
+   - `NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)`
+   - `aws dynamodb put-item --table-name ${project_name}-summaries-${environment} --item '{"call_id":{"S":"test-call-001"},"status":{"S":"TESTING"},"created_at":{"S":"'"$NOW"'"}}'`
+   - `aws dynamodb get-item --table-name ${project_name}-summaries-${environment} --key '{"call_id":{"S":"test-call-001"}}'`
+   - Cleanup: `aws dynamodb delete-item --table-name ${project_name}-summaries-${environment} --key '{"call_id":{"S":"test-call-001"}}'`
+
 ---
 
 ## 3) Create Secrets in AWS Secrets Manager
@@ -226,6 +286,15 @@ The webhook handler validates requests using `WEBHOOK_TOKEN` (environment variab
 ```
 4. **Secret name**: your `webhook_token_secret_name` (recommended: `customer-care-call-processor-webhook-config`).
 5. Store.
+
+### 3.3 Test / verify Secrets Manager
+AWS CLI smoke tests:
+1. Confirm the secret exists:
+   - `aws secretsmanager describe-secret --secret-id <google_credentials_secret_name>`
+2. Confirm you can read it (this should return JSON):
+   - `aws secretsmanager get-secret-value --secret-id <google_credentials_secret_name> --query SecretString --output text | head -c 200 && echo`
+
+Note: you should not print secrets in logs or commit them to git.
 
 ---
 
@@ -354,6 +423,18 @@ Enable it in API Gateway:
 2. Find **CloudWatch log role ARN**.
 3. Paste the role ARN.
 4. Save.
+
+### 4.4 Test / verify IAM permissions
+The fastest way to validate IAM is to **invoke the Lambdas** and see whether they can access S3/DynamoDB/Secrets.
+
+If you want a direct IAM-only check, use the IAM Policy Simulator:
+1. Go to IAM → **Roles** → open `${project_name}-lambda-role-${environment}`.
+2. Click **Permissions** → **Policy simulator**.
+3. Simulate actions like:
+   - `s3:PutObject` on your bucket
+   - `dynamodb:PutItem` on your tables
+   - `secretsmanager:GetSecretValue` on your secret
+4. Fix policy mistakes before moving on.
 
 ---
 
@@ -499,6 +580,27 @@ Functions (match Terraform names/handlers):
 - Env vars: `CONNECTIONS_TABLE`, `WEBSOCKET_ENDPOINT`, `ENVIRONMENT`
   - Set `WEBSOCKET_ENDPOINT` after you create the WebSocket API stage (it looks like `wss://.../dev`).
 
+### 5.4 Unit test + smoke test Lambda
+Local unit tests (no AWS deploy required):
+1. Install dependencies:
+   - `pip install -r requirements.txt`
+2. Run the unit test suites:
+   - `pytest -m "not integration" -v`
+3. Run only the most relevant files:
+   - `pytest tests/test_webhook_handler.py -v`
+   - `pytest tests/test_processing.py -v`
+   - `pytest tests/test_api.py -v`
+
+Optional local “sanity checks”:
+- Syntax/bytecode compile:
+  - `python -m compileall src/lambda`
+
+AWS smoke tests (after deployment):
+1. Invoke webhook handler with a **sync** notification (expected: `200` if token validation passes, otherwise `401`):
+   - `aws lambda invoke --function-name ${project_name}-webhook-handler-${environment} --payload '{"headers":{"X-Goog-Resource-State":"sync","X-Goog-Channel-Token":"<WEBHOOK_TOKEN>"}}' /tmp/webhook_out.json && cat /tmp/webhook_out.json`
+2. Invoke list summaries handler (will likely return 401 without authorizer claims when invoked directly; that’s fine for a basic “Lambda runs” check):
+   - `aws lambda invoke --function-name ${project_name}-list-summaries-${environment} --payload '{}' /tmp/list_out.json && cat /tmp/list_out.json`
+
 ---
 
 ## 6) Create the Step Functions State Machine
@@ -547,6 +649,28 @@ Terraform defines a rule but does not attach a target. If you want this to actua
 4. Target: **Step Functions state machine** → pick `${project_name}-pipeline-${environment}`.
 5. Allow EventBridge to invoke Step Functions (it will guide you to create a role).
 6. Create.
+
+### 6.5 Test / verify Step Functions
+AWS Console smoke test:
+1. Step Functions → open `${project_name}-pipeline-${environment}`.
+2. Click **Start execution**.
+3. Use a simple input JSON (you may need to adjust for your definition):
+```json
+{
+   "call_id": "test-call-001",
+   "s3_bucket": "<s3_bucket_name>",
+   "s3_key": "raw-audio/test/test-call-001.mp3",
+   "caller_id": "+10000000000",
+   "assigned_user_id": "test-user"
+}
+```
+4. Start execution and confirm:
+    - Execution is created
+    - It transitions through the first state(s)
+
+AWS CLI smoke test:
+- `aws stepfunctions list-state-machines | head`
+- `aws stepfunctions describe-state-machine --state-machine-arn <STATE_MACHINE_ARN>`
 
 ---
 
@@ -601,6 +725,22 @@ Source: [terraform/cognito.tf](terraform/cognito.tf)
    - `caseworkers` (precedence 3)
    - `supervisors` (precedence 2)
    - `admin` (precedence 1)
+
+### 7.5 Test / verify Cognito
+The most beginner-friendly test is the Hosted UI:
+1. Go to Cognito → your user pool → **App integration**.
+2. Find the **Hosted UI** / domain URL.
+3. Create a test user in the Console:
+   - Users → **Create user**
+   - Set a temporary password
+4. Add the user to a group (admin/caseworkers).
+5. Use the Hosted UI login to confirm the user can authenticate.
+
+If you want to call the API from curl/Postman, you’ll need a valid JWT access token. The easiest way is Postman OAuth2 (Authorization Code flow) using:
+- Cognito domain
+- Client ID
+- Callback URL configured on the app client
+- Scopes: `openid email profile`
 
 ---
 
@@ -657,6 +797,32 @@ Create stage
 4. Copy the stage invoke URL (wss://...).
 5. Update the `ws-notify` Lambda env var `WEBSOCKET_ENDPOINT` to this URL.
 
+### 8.3 Test / verify API Gateway
+HTTP API smoke tests:
+
+1) Test `/webhook` without Google (simulate a sync request)
+- Build the URL:
+   - `WEBHOOK_URL="https://<http-api-id>.execute-api.<region>.amazonaws.com/${environment}/webhook"`
+- Send a sync request with the token header:
+   - `curl -i -X POST "$WEBHOOK_URL" -H "X-Goog-Resource-State: sync" -H "X-Goog-Channel-Token: <WEBHOOK_TOKEN>"`
+
+Expected outcomes:
+- `200` means your handler accepted the sync event
+- `401` means token validation failed (check `WEBHOOK_TOKEN` env var and header spelling)
+
+2) Test authenticated endpoints (`/summaries`)
+- You need a Cognito JWT (see Section 7.5).
+- Example:
+   - `API_URL="https://<http-api-id>.execute-api.<region>.amazonaws.com/${environment}"`
+   - `curl -sS -H "Authorization: Bearer <ACCESS_TOKEN>" "$API_URL/summaries" | head -c 300 && echo`
+
+WebSocket smoke tests:
+1. Install a client:
+    - `npm install -g wscat`
+2. Connect:
+    - `wscat -c "wss://<websocket-api-id>.execute-api.<region>.amazonaws.com/${environment}"`
+3. If your connect/disconnect Lambdas write to DynamoDB, confirm connection records appear in `${project_name}-connections-${environment}`.
+
 ---
 
 ## 9) Monitoring (CloudWatch + SNS)
@@ -700,6 +866,20 @@ Terraform creates a dashboard. Manually, you can start simple:
    - AWS/States → By State Machine ARN → ExecutionsFailed
    - Threshold: `>= 1`
 
+### 9.5 Test / verify Monitoring
+SNS publish smoke test:
+1. Go to SNS → Topics → open `${project_name}-alerts-${environment}`.
+2. Click **Publish message** and send a test message.
+3. If you added an email subscription, confirm you receive it.
+
+CloudWatch logs smoke test:
+1. CloudWatch → Logs → Log groups.
+2. Confirm log groups exist for:
+   - `/aws/lambda/${project_name}-webhook-handler-${environment}`
+   - `/aws/step-functions/${project_name}-pipeline-${environment}`
+   - `/aws/apigateway/${project_name}-${environment}`
+3. Trigger activity (invoke Lambda / start Step Functions) and confirm new log events appear.
+
 ---
 
 ## 10) Post-Setup Checklist (to make the system actually work)
@@ -713,6 +893,16 @@ Terraform creates a dashboard. Manually, you can start simple:
    - See [scripts/register_webhook.py](scripts/register_webhook.py)
    - You’ll need the webhook URL: `https://<http-api-id>.execute-api.<region>.amazonaws.com/<env>/webhook`
 5. Configure frontend env vars (see Terraform output format in [terraform/outputs.tf](terraform/outputs.tf)).
+
+6. Run local unit tests to validate the code paths:
+   - `pytest -m "not integration" -v`
+
+7. Run AWS smoke tests (minimal):
+   - S3 upload/download (Section 1.5)
+   - DynamoDB put/get (Section 2.4)
+   - Lambda invoke (Section 5.4)
+   - Step Functions start execution (Section 6.5)
+   - API Gateway webhook call (Section 8.3)
 
 ---
 
