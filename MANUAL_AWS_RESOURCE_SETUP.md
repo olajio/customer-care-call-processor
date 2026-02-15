@@ -904,6 +904,96 @@ CloudWatch logs smoke test:
    - Step Functions start execution (Section 6.5)
    - API Gateway webhook call (Section 8.3)
 
+### 10.1 Incremental multi-component tests (build up to full workflow)
+These tests deliberately connect **several components at once**. Run them in order. Don’t move to the next level until the current one passes.
+
+Before you start, set shell variables once:
+- `REGION=<your-region>`
+- `ENV=<environment>`
+- `PROJECT=customer-care-call-processor`
+- `S3_BUCKET=<s3_bucket_name>`
+- `DDB_SUMMARIES=${PROJECT}-summaries-${ENV}`
+- `DDB_CONNECTIONS=${PROJECT}-connections-${ENV}`
+- `API_URL=https://<http-api-id>.execute-api.${REGION}.amazonaws.com/${ENV}`
+- `WEBHOOK_URL=${API_URL}/webhook`
+- `WS_URL=wss://<websocket-api-id>.execute-api.${REGION}.amazonaws.com/${ENV}`
+
+#### Level 1 — HTTP API Gateway → Lambda (webhook) → CloudWatch logs
+Goal: confirm API Gateway is invoking the Lambda integration and you can see logs.
+1. Send a webhook “sync” request:
+   - `curl -i -X POST "$WEBHOOK_URL" -H "X-Goog-Resource-State: sync" -H "X-Goog-Channel-Token: <WEBHOOK_TOKEN>"`
+2. In CloudWatch Logs, open log group:
+   - `/aws/lambda/${PROJECT}-webhook-handler-${ENV}`
+3. Confirm you see a new log stream/event for that request.
+
+If this fails:
+- `403/5xx` from API Gateway usually means route/integration/stage misconfigured.
+- `401` often means webhook token validation failed.
+
+#### Level 2 — Step Functions → Lambda(s) → DynamoDB status updates
+Goal: confirm Step Functions can invoke Lambdas and Lambdas can read/write DynamoDB.
+
+This is a “wiring test”. It can still pass even if Transcribe/Bedrock later fail.
+1. Create a placeholder audio object in S3 (so S3 keys exist):
+   - `echo "fake audio" > /tmp/fake-audio.txt`
+   - `aws s3 cp /tmp/fake-audio.txt s3://$S3_BUCKET/raw-audio/test/fake-audio.txt --region $REGION`
+2. Start a Step Functions execution from the Console (recommended first) OR via CLI:
+   - `aws stepfunctions start-execution --state-machine-arn <STATE_MACHINE_ARN> --input '{"call_id":"test-call-001","s3_bucket":"'"$S3_BUCKET"'","s3_key":"raw-audio/test/fake-audio.txt","caller_id":"+10000000000","assigned_user_id":"test-user"}' --region $REGION`
+3. In DynamoDB `${DDB_SUMMARIES}`, look for an item with `call_id = test-call-001`.
+4. Confirm you see status transitions written by the `update-status` Lambda (even if later steps fail).
+
+If this fails:
+- Check the Step Functions execution event history for the exact failing state.
+- Most common cause is missing IAM permissions (Step Functions role invoking Lambda; Lambda role writing to DynamoDB).
+
+#### Level 3 — Cognito login → HTTP API authorized route → DynamoDB read
+Goal: confirm Cognito JWT auth works and the API can read from DynamoDB.
+1. Create a test user in Cognito and add them to `admin` group.
+2. Obtain an access token (Hosted UI / Postman OAuth2 Authorization Code flow).
+3. Call the summaries endpoint:
+   - `curl -sS -H "Authorization: Bearer <ACCESS_TOKEN>" "$API_URL/summaries" | head -c 500 && echo`
+4. Confirm you get a `200` and a JSON body containing `items`.
+
+If this fails:
+- `401/403` usually means authorizer issuer/audience is wrong, or the token is expired.
+- `5xx` usually means Lambda runtime error or DynamoDB permissions.
+
+#### Level 4 — WebSocket connect → DynamoDB connections table → notify Lambda
+Goal: confirm the WebSocket connection flow works end-to-end and the notify Lambda can publish messages back to a live connection.
+
+1. Connect with `wscat`:
+   - `wscat -c "$WS_URL"`
+2. In another terminal, verify the connect lambda ran (CloudWatch logs):
+   - `/aws/lambda/${PROJECT}-ws-connect-${ENV}`
+3. Check `${DDB_CONNECTIONS}` in DynamoDB for the most recent `connection_id`.
+   - (If your connect lambda doesn’t write to DynamoDB yet, you’ll need to capture the connection id from logs.)
+4. Trigger a notify:
+   - Invoke `${PROJECT}-ws-notify-${ENV}` with a payload that targets the connection id you found.
+   - Confirm `wscat` receives the message.
+
+If this fails:
+- Ensure `WEBSOCKET_ENDPOINT` env var on `ws-notify` points to the correct stage invoke URL.
+- Ensure the Lambda execution role has `execute-api:ManageConnections` on the WebSocket API execution ARN.
+
+#### Level 5 — Full end-to-end workflow (only after Levels 1–4)
+Goal: confirm the real workflow (webhook → pipeline → summary saved → API reads it → optional notification) works.
+
+Prerequisites:
+- A real audio file that Amazon Transcribe can process (mp3/wav/etc).
+- Bedrock model access enabled (Section 0.5).
+- Google Drive webhook registration completed (or an equivalent manual trigger path).
+
+Minimal full-workflow test approach (without Google Drive):
+1. Upload a small real audio file to:
+   - `s3://$S3_BUCKET/raw-audio/test/<yourfile>.mp3`
+2. Start a Step Functions execution pointing at that S3 key.
+3. Watch execution until it completes (or fails).
+4. Confirm DynamoDB item status is `COMPLETED` and summary fields are populated.
+5. Call `GET /summaries` and `GET /summaries/{call_id}` from the HTTP API to validate the API can serve the result.
+
+If this fails:
+- Use the failing state in Step Functions + the Lambda logs for that state to pinpoint whether it’s Transcribe access, S3 permissions, Bedrock access, or JSON parsing.
+
 ---
 
 ## 11) Cleanup (Cost-Saving Teardown)
