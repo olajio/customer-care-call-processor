@@ -1653,8 +1653,7 @@ resource "aws_iam_role_policy" "webhook_lambda_policy" {
         Effect = "Allow"
         Action = [
           "s3:PutObject",
-          "s3:GetObject",
-          "s3:HeadObject"
+          "s3:GetObject"
         ]
         Resource = "arn:aws:s3:::${var.s3_bucket}/*"
       },

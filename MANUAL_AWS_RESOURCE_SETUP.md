@@ -337,7 +337,7 @@ Important:
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["s3:PutObject", "s3:GetObject", "s3:HeadObject", "s3:DeleteObject"],
+         "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
       "Resource": "<S3_BUCKET_ARN>/*"
     },
     {
