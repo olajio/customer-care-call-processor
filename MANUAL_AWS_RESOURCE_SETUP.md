@@ -317,12 +317,19 @@ Goal: a role that every Lambda function uses.
 7. **Role name**: `${project_name}-lambda-role-${environment}`.
 8. Create role.
 
-Add the inline policy
+Add the base inline policy (no “future ARNs”)
 1. Open the new role.
 2. Go to **Permissions** tab → **Add permissions** → **Create inline policy**.
 3. Choose **JSON**.
 4. Paste and edit this policy. You must replace placeholders like `<S3_BUCKET_ARN>` with real values.
    - Tip: open each resource in the Console and copy its ARN.
+
+Important:
+- At this point in the guide, you *do not yet have* the Step Functions state machine ARN, the WebSocket API execution ARN, or the SNS topic ARN.
+- So this base policy intentionally does **not** include:
+   - `states:StartExecution` (add after Section 6)
+   - `execute-api:ManageConnections` (add after Section 8)
+   - `sns:Publish` (add after Section 9)
 
 ```json
 {
@@ -367,21 +374,6 @@ Add the inline policy
     },
     {
       "Effect": "Allow",
-      "Action": ["states:StartExecution"],
-      "Resource": "<STATE_MACHINE_ARN>"
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["execute-api:ManageConnections"],
-      "Resource": "<WEBSOCKET_API_EXECUTION_ARN>/*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["sns:Publish"],
-      "Resource": "<SNS_TOPIC_ARN>"
-    },
-    {
-      "Effect": "Allow",
       "Action": ["cloudwatch:PutMetricData"],
       "Resource": "*"
     },
@@ -398,18 +390,21 @@ Add the inline policy
 6. **Policy name**: `${project_name}-lambda-policy-${environment}`.
 7. Click **Create policy**.
 
+Later, come back and add the missing permissions:
+- After Section 6: add `states:StartExecution` on your state machine
+- After Section 8: add `execute-api:ManageConnections` on your WebSocket API execution ARN
+- After Section 9: add `sns:Publish` to your alerts topic ARN
+
 ### 4.2 Step Functions role
 1. IAM → Roles → **Create role**.
 2. AWS service → **Step Functions**.
 3. Role name: `${project_name}-sfn-role-${environment}`.
 4. Create.
-5. Add an inline policy named `${project_name}-sfn-policy-${environment}` that allows:
-   - `lambda:InvokeFunction` on the pipeline Lambdas
-   - `transcribe:GetTranscriptionJob`
-   - Step Functions logging delivery actions
-   - X-Ray actions
+5. Do **not** add the inline policy yet.
 
-Tip: you can copy the JSON shape from [terraform/step_functions.tf](terraform/step_functions.tf) and replace ARNs.
+Why: the Step Functions policy needs the **Lambda ARNs**, and you won’t have those until after you create the Lambda functions in Section 5.
+
+You will come back in Section 6 (right before creating the state machine) to add the inline policy named `${project_name}-sfn-policy-${environment}`.
 
 ### 4.3 (Optional) API Gateway CloudWatch logging role
 Terraform optionally creates a role for API Gateway logging.
@@ -612,6 +607,17 @@ Source: [terraform/step_functions.tf](terraform/step_functions.tf)
 3. Retention: `log_retention_days` (Terraform default: 30).
 4. Create.
 
+### 6.1.1 Finish the Step Functions role inline policy (now you have the log group)
+You created the role in Section 4.2, but you delayed the policy until the Lambdas existed.
+
+1. IAM → Roles → open `${project_name}-sfn-role-${environment}`.
+2. Permissions → **Add permissions** → **Create inline policy** → JSON.
+3. Use the JSON shape from [terraform/step_functions.tf](terraform/step_functions.tf) and replace placeholders with your real ARNs:
+   - The 6 pipeline Lambda ARNs you pasted into the state machine definition
+   - The Step Functions log group ARN for `/aws/step-functions/${project_name}-pipeline-${environment}`
+4. Policy name: `${project_name}-sfn-policy-${environment}`.
+5. Create.
+
 ### 6.2 Create the state machine
 1. Go to **Step Functions** → **State machines** → **Create state machine**.
 2. Type: **Standard**.
@@ -636,6 +642,18 @@ Source: [terraform/step_functions.tf](terraform/step_functions.tf)
 ### 6.3 Update Lambda environment variables that depend on Step Functions
 Go back to the webhook handler Lambda and set:
 - `STEP_FUNCTION_ARN` = your state machine ARN
+
+### 6.3.1 Update the Lambda execution role to allow starting the state machine
+Now that the state machine exists, go back and add this permission to `${project_name}-lambda-role-${environment}`.
+
+IAM → Roles → `${project_name}-lambda-role-${environment}` → Permissions → edit your inline policy JSON and add:
+```json
+{
+   "Effect": "Allow",
+   "Action": ["states:StartExecution"],
+   "Resource": "<STATE_MACHINE_ARN>"
+}
+```
 
 ### 6.4 (Optional) Create an EventBridge rule for Transcribe completion
 Terraform defines a rule but does not attach a target. If you want this to actually trigger Step Functions, you must add a target.
@@ -797,6 +815,23 @@ Create stage
 4. Copy the stage invoke URL (wss://...).
 5. Update the `ws-notify` Lambda env var `WEBSOCKET_ENDPOINT` to this URL.
 
+### 8.2.1 Update the Lambda execution role to allow WebSocket ManageConnections
+Now that the WebSocket API exists, go back and add this permission to `${project_name}-lambda-role-${environment}`:
+
+```json
+{
+   "Effect": "Allow",
+   "Action": ["execute-api:ManageConnections"],
+   "Resource": "<WEBSOCKET_CONNECTIONS_ARN>"
+}
+```
+
+How to get the execution ARN:
+- It is the `arn:aws:execute-api:...` ARN for your WebSocket API connections endpoint (includes API ID, stage, and `@connections`).
+- If you’re unsure, use the AWS CLI to derive it:
+   - `aws apigatewayv2 get-apis --query "Items[?Name=='${project_name}-websocket-${environment}'].[ApiId,Name]" --output table`
+   - Then build: `arn:aws:execute-api:<REGION>:<ACCOUNT_ID>:<ApiId>/${environment}/POST/@connections/*`
+
 ### 8.3 Test / verify API Gateway
 HTTP API smoke tests:
 
@@ -840,6 +875,17 @@ Add email subscription (optional)
 3. Endpoint: your email.
 4. Create.
 5. Confirm the subscription from your email.
+
+### 9.1.1 Update the Lambda execution role to allow publishing alerts
+Now that the SNS topic exists, go back and add this permission to `${project_name}-lambda-role-${environment}`:
+
+```json
+{
+   "Effect": "Allow",
+   "Action": ["sns:Publish"],
+   "Resource": "<SNS_TOPIC_ARN>"
+}
+```
 
 ### 9.2 Set CloudWatch log retention
 Log groups are created automatically when services write logs, but retention defaults to “Never expire”. Set it to 30 days (or your preferred value):
