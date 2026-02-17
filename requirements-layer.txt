@@ -1,0 +1,8 @@
+# Runtime dependencies to package into the Lambda dependency layer.
+# Keep this limited to libraries not provided by the AWS Lambda Python runtime.
+
+# Google Drive API client (used by src/lambda/webhook/handler.py)
+google-api-python-client==2.110.0
+google-auth==2.25.2
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.0

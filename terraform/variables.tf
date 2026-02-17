@@ -108,6 +108,12 @@ variable "processing_lambda_timeout" {
   default     = 300
 }
 
+variable "lambda_runtime" {
+  description = "Lambda runtime to use for all functions (must be supported in the target AWS region)"
+  type        = string
+  default     = "python3.14"
+}
+
 variable "bedrock_lambda_memory" {
   description = "Memory allocation for Bedrock summarization Lambda (MB)"
   type        = number

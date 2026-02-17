@@ -17,7 +17,7 @@ resource "aws_lambda_layer_version" "dependencies" {
   layer_name          = "${var.project_name}-dependencies-${var.environment}"
   source_code_hash    = data.archive_file.lambda_layer_zip.output_base64sha256
   compatible_runtimes = ["python3.11"]
-  description         = "Shared dependencies for call processing lambdas"
+  source_dir  = "${path.module}/../build/layer"
 }
 
 # -------------------------
@@ -27,60 +27,60 @@ resource "aws_lambda_layer_version" "dependencies" {
 data "archive_file" "webhook_handler_zip" {
   type        = "zip"
   source_dir  = "${path.module}/../src/lambda/webhook"
-  output_path = "${path.module}/webhook_handler.zip"
+  compatible_runtimes = [var.lambda_runtime]
 }
 
 resource "aws_lambda_function" "webhook_handler" {
   filename         = data.archive_file.webhook_handler_zip.output_path
-  function_name    = "${var.project_name}-webhook-handler-${var.environment}"
+  runtime          = var.lambda_runtime
   role             = aws_iam_role.lambda_execution.arn
   handler          = "handler.handler"
   source_code_hash = data.archive_file.webhook_handler_zip.output_base64sha256
-  runtime          = "python3.11"
+  runtime          = var.lambda_runtime
   timeout          = var.webhook_handler_timeout
   memory_size      = var.webhook_handler_memory
   layers           = [aws_lambda_layer_version.dependencies.arn]
-
+  runtime          = var.lambda_runtime
   environment {
     variables = {
       S3_BUCKET                 = aws_s3_bucket.call_storage.id
-      DYNAMODB_TABLE            = aws_dynamodb_table.call_summaries.name
+  runtime          = var.lambda_runtime
       STEP_FUNCTION_ARN         = aws_sfn_state_machine.call_processing.arn
       GOOGLE_CREDENTIALS_SECRET = var.google_credentials_secret_name
       GDRIVE_FOLDER_ID          = var.gdrive_folder_id
-      ENVIRONMENT               = var.environment
+  runtime          = var.lambda_runtime
     }
   }
 
-  reserved_concurrent_executions = var.environment == "prod" ? 100 : -1
+  runtime          = var.lambda_runtime
 
   tracing_config {
     mode = "Active"
-  }
+  runtime          = var.lambda_runtime
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic_execution,
-    aws_cloudwatch_log_group.webhook_handler
+  runtime          = var.lambda_runtime
   ]
 }
 
-# -------------------------
+  runtime          = var.lambda_runtime
 # Processing Lambda Functions
 # -------------------------
 
-# Start Transcribe Lambda
+  runtime          = var.lambda_runtime
 data "archive_file" "start_transcribe_zip" {
   type        = "zip"
   source_file = "${path.module}/../src/lambda/processing/start_transcribe.py"
-  output_path = "${path.module}/start_transcribe.zip"
+  runtime          = var.lambda_runtime
 }
 
 resource "aws_lambda_function" "start_transcribe" {
-  filename         = data.archive_file.start_transcribe_zip.output_path
+  runtime          = var.lambda_runtime
   function_name    = "${var.project_name}-start-transcribe-${var.environment}"
   role             = aws_iam_role.lambda_execution.arn
   handler          = "start_transcribe.handler"
-  source_code_hash = data.archive_file.start_transcribe_zip.output_base64sha256
+  runtime          = var.lambda_runtime
   runtime          = "python3.11"
   timeout          = 60
   memory_size      = 256

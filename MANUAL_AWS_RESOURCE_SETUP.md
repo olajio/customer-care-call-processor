@@ -437,7 +437,7 @@ If you want a direct IAM-only check, use the IAM Policy Simulator:
 Source: [terraform/lambda.tf](terraform/lambda.tf)
 
 ### 5.0 Packaging note (important)
-Terraform zips the source under [src/lambda](src/lambda) and publishes it as a layer.
+Terraform builds a dependency layer from pip-installed packages under `build/layer/python` and publishes it as a layer.
 
 For a working Python dependency layer (recommended), you usually need the Lambda layer structure:
 `python/` (contains site-packages).

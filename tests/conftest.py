@@ -10,9 +10,10 @@ from unittest.mock import Mock, MagicMock, patch
 # Set up test environment variables
 os.environ['DYNAMODB_TABLE'] = 'test-call-summaries'
 os.environ['S3_BUCKET'] = 'test-bucket'
-os.environ['WEBSOCKET_CONNECTIONS_TABLE'] = 'test-websocket-connections'
-os.environ['WEBHOOK_CHANNELS_TABLE'] = 'test-webhook-channels'
-os.environ['STEP_FUNCTIONS_ARN'] = 'arn:aws:states:us-east-1:123456789012:stateMachine:test'
+os.environ['CONNECTIONS_TABLE'] = 'test-websocket-connections'
+os.environ['WEBSOCKET_CONNECTIONS_TABLE'] = 'test-websocket-connections'  # legacy alias
+os.environ['STEP_FUNCTION_ARN'] = 'arn:aws:states:us-east-1:123456789012:stateMachine:test'
+os.environ['STEP_FUNCTIONS_ARN'] = 'arn:aws:states:us-east-1:123456789012:stateMachine:test'  # legacy alias
 os.environ['PRESIGNED_URL_EXPIRATION'] = '3600'
 os.environ['BEDROCK_MODEL_ID'] = 'anthropic.claude-3-5-sonnet-20241022-v2:0'
 os.environ['MAX_TOKENS'] = '4096'

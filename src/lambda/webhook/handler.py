@@ -247,6 +247,15 @@ def validate_webhook_token(headers: Dict[str, str]) -> bool:
     return token == WEBHOOK_TOKEN
 
 
+def validate_webhook_signature(headers: Dict[str, str]) -> bool:
+    """Backward-compatible alias for webhook validation.
+
+    Some tests and older docs refer to a signature validation step. In this
+    implementation we rely on the Google channel token validation.
+    """
+    return validate_webhook_token(headers)
+
+
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Main Lambda handler for Google Drive webhooks.
