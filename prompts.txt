@@ -1,0 +1,17 @@
+create an instruction file to add the lambda functions to my aws console with the necessary requirement and variables.
+
+Env vars:
+S3_BUCKET = your S3 bucket name
+DYNAMODB_TABLE = ${project_name}-summaries-${environment}
+STEP_FUNCTION_ARN = (placeholder for now; fill after Step Functions)
+GOOGLE_CREDENTIALS_SECRET = google_credentials_secret_name
+GDRIVE_FOLDER_ID = your folder id
+WEBHOOK_TOKEN = the token you generated
+ENVIRONMENT = environment
+
+Check my existing lambda functions on my aws console for the runtime etc Timeout should be 1 minutes
+
+Prompt to create lambda functions
+
+Create the lambda functions on my aws console. If lambda function exists already, skip and create the non existing functions. 
+Be meticulous in the lambda function requirements. Do not guess
