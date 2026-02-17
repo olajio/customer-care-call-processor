@@ -8,7 +8,7 @@
 
 data "archive_file" "lambda_layer_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/../src/lambda"
+  source_dir  = "${path.module}/../build/layer"
   output_path = "${path.module}/lambda_layer.zip"
 }
 
@@ -16,8 +16,7 @@ resource "aws_lambda_layer_version" "dependencies" {
   filename            = data.archive_file.lambda_layer_zip.output_path
   layer_name          = "${var.project_name}-dependencies-${var.environment}"
   source_code_hash    = data.archive_file.lambda_layer_zip.output_base64sha256
-  compatible_runtimes = ["python3.11"]
-  source_dir  = "${path.module}/../build/layer"
+  compatible_runtimes = [var.lambda_runtime]
 }
 
 # -------------------------
@@ -27,12 +26,12 @@ resource "aws_lambda_layer_version" "dependencies" {
 data "archive_file" "webhook_handler_zip" {
   type        = "zip"
   source_dir  = "${path.module}/../src/lambda/webhook"
-  compatible_runtimes = [var.lambda_runtime]
+  output_path = "${path.module}/webhook_handler.zip"
 }
 
 resource "aws_lambda_function" "webhook_handler" {
   filename         = data.archive_file.webhook_handler_zip.output_path
-  runtime          = var.lambda_runtime
+  function_name    = "${var.project_name}-webhook-handler-${var.environment}"
   role             = aws_iam_role.lambda_execution.arn
   handler          = "handler.handler"
   source_code_hash = data.archive_file.webhook_handler_zip.output_base64sha256
@@ -40,48 +39,38 @@ resource "aws_lambda_function" "webhook_handler" {
   timeout          = var.webhook_handler_timeout
   memory_size      = var.webhook_handler_memory
   layers           = [aws_lambda_layer_version.dependencies.arn]
-  runtime          = var.lambda_runtime
   environment {
     variables = {
       S3_BUCKET                 = aws_s3_bucket.call_storage.id
-  runtime          = var.lambda_runtime
       STEP_FUNCTION_ARN         = aws_sfn_state_machine.call_processing.arn
       GOOGLE_CREDENTIALS_SECRET = var.google_credentials_secret_name
       GDRIVE_FOLDER_ID          = var.gdrive_folder_id
-  runtime          = var.lambda_runtime
     }
   }
 
-  runtime          = var.lambda_runtime
-
   tracing_config {
     mode = "Active"
-  runtime          = var.lambda_runtime
+  }
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic_execution,
-  runtime          = var.lambda_runtime
   ]
 }
-
-  runtime          = var.lambda_runtime
 # Processing Lambda Functions
 # -------------------------
-
-  runtime          = var.lambda_runtime
 data "archive_file" "start_transcribe_zip" {
   type        = "zip"
   source_file = "${path.module}/../src/lambda/processing/start_transcribe.py"
-  runtime          = var.lambda_runtime
+  output_path = "${path.module}/start_transcribe.zip"
 }
 
 resource "aws_lambda_function" "start_transcribe" {
-  runtime          = var.lambda_runtime
+  filename         = data.archive_file.start_transcribe_zip.output_path
   function_name    = "${var.project_name}-start-transcribe-${var.environment}"
   role             = aws_iam_role.lambda_execution.arn
   handler          = "start_transcribe.handler"
+  source_code_hash = data.archive_file.start_transcribe_zip.output_base64sha256
   runtime          = var.lambda_runtime
-  runtime          = "python3.11"
   timeout          = 60
   memory_size      = 256
 
@@ -111,7 +100,7 @@ resource "aws_lambda_function" "process_transcript" {
   role             = aws_iam_role.lambda_execution.arn
   handler          = "process_transcript.handler"
   source_code_hash = data.archive_file.process_transcript_zip.output_base64sha256
-  runtime          = "python3.11"
+  runtime          = var.lambda_runtime
   timeout          = var.processing_lambda_timeout
   memory_size      = var.processing_lambda_memory
 
@@ -141,7 +130,7 @@ resource "aws_lambda_function" "generate_summary" {
   role             = aws_iam_role.lambda_execution.arn
   handler          = "generate_summary.handler"
   source_code_hash = data.archive_file.generate_summary_zip.output_base64sha256
-  runtime          = "python3.11"
+  runtime          = var.lambda_runtime
   timeout          = var.bedrock_lambda_timeout
   memory_size      = var.bedrock_lambda_memory
 
@@ -172,7 +161,7 @@ resource "aws_lambda_function" "save_summary" {
   role             = aws_iam_role.lambda_execution.arn
   handler          = "save_summary.handler"
   source_code_hash = data.archive_file.save_summary_zip.output_base64sha256
-  runtime          = "python3.11"
+  runtime          = var.lambda_runtime
   timeout          = 60
   memory_size      = 256
 
@@ -201,7 +190,7 @@ resource "aws_lambda_function" "update_status" {
   role             = aws_iam_role.lambda_execution.arn
   handler          = "update_status.handler"
   source_code_hash = data.archive_file.update_status_zip.output_base64sha256
-  runtime          = "python3.11"
+  runtime          = var.lambda_runtime
   timeout          = 30
   memory_size      = 128
 
@@ -234,7 +223,7 @@ resource "aws_lambda_function" "list_summaries" {
   role             = aws_iam_role.lambda_execution.arn
   handler          = "list_summaries.handler"
   source_code_hash = data.archive_file.list_summaries_zip.output_base64sha256
-  runtime          = "python3.11"
+  runtime          = var.lambda_runtime
   timeout          = 30
   memory_size      = 256
 
@@ -263,7 +252,7 @@ resource "aws_lambda_function" "get_summary" {
   role             = aws_iam_role.lambda_execution.arn
   handler          = "get_summary.handler"
   source_code_hash = data.archive_file.get_summary_zip.output_base64sha256
-  runtime          = "python3.11"
+  runtime          = var.lambda_runtime
   timeout          = 30
   memory_size      = 256
 
@@ -297,7 +286,7 @@ resource "aws_lambda_function" "websocket_connect" {
   role             = aws_iam_role.lambda_execution.arn
   handler          = "connect.handler"
   source_code_hash = data.archive_file.ws_connect_zip.output_base64sha256
-  runtime          = "python3.11"
+  runtime          = var.lambda_runtime
   timeout          = 10
   memory_size      = 128
 
@@ -326,7 +315,7 @@ resource "aws_lambda_function" "websocket_disconnect" {
   role             = aws_iam_role.lambda_execution.arn
   handler          = "disconnect.handler"
   source_code_hash = data.archive_file.ws_disconnect_zip.output_base64sha256
-  runtime          = "python3.11"
+  runtime          = var.lambda_runtime
   timeout          = 10
   memory_size      = 128
 
@@ -355,7 +344,7 @@ resource "aws_lambda_function" "websocket_notify" {
   role             = aws_iam_role.lambda_execution.arn
   handler          = "notify.handler"
   source_code_hash = data.archive_file.ws_notify_zip.output_base64sha256
-  runtime          = "python3.11"
+  runtime          = var.lambda_runtime
   timeout          = 30
   memory_size      = 256
 
@@ -370,60 +359,6 @@ resource "aws_lambda_function" "websocket_notify" {
   tracing_config {
     mode = "Active"
   }
-}
-
-# -------------------------
-# CloudWatch Log Groups
-# -------------------------
-
-resource "aws_cloudwatch_log_group" "webhook_handler" {
-  name              = "/aws/lambda/${var.project_name}-webhook-handler-${var.environment}"
-  retention_in_days = var.log_retention_days
-}
-
-resource "aws_cloudwatch_log_group" "start_transcribe" {
-  name              = "/aws/lambda/${var.project_name}-start-transcribe-${var.environment}"
-  retention_in_days = var.log_retention_days
-}
-
-resource "aws_cloudwatch_log_group" "process_transcript" {
-  name              = "/aws/lambda/${var.project_name}-process-transcript-${var.environment}"
-  retention_in_days = var.log_retention_days
-}
-
-resource "aws_cloudwatch_log_group" "generate_summary" {
-  name              = "/aws/lambda/${var.project_name}-generate-summary-${var.environment}"
-  retention_in_days = var.log_retention_days
-}
-
-resource "aws_cloudwatch_log_group" "save_summary" {
-  name              = "/aws/lambda/${var.project_name}-save-summary-${var.environment}"
-  retention_in_days = var.log_retention_days
-}
-
-resource "aws_cloudwatch_log_group" "list_summaries" {
-  name              = "/aws/lambda/${var.project_name}-list-summaries-${var.environment}"
-  retention_in_days = var.log_retention_days
-}
-
-resource "aws_cloudwatch_log_group" "get_summary" {
-  name              = "/aws/lambda/${var.project_name}-get-summary-${var.environment}"
-  retention_in_days = var.log_retention_days
-}
-
-resource "aws_cloudwatch_log_group" "websocket_connect" {
-  name              = "/aws/lambda/${var.project_name}-ws-connect-${var.environment}"
-  retention_in_days = var.log_retention_days
-}
-
-resource "aws_cloudwatch_log_group" "websocket_disconnect" {
-  name              = "/aws/lambda/${var.project_name}-ws-disconnect-${var.environment}"
-  retention_in_days = var.log_retention_days
-}
-
-resource "aws_cloudwatch_log_group" "websocket_notify" {
-  name              = "/aws/lambda/${var.project_name}-ws-notify-${var.environment}"
-  retention_in_days = var.log_retention_days
 }
 
 # -------------------------

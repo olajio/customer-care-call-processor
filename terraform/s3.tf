@@ -110,6 +110,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "call_storage" {
     id     = "cleanup-incomplete-uploads"
     status = "Enabled"
 
+    filter {
+      prefix = ""
+    }
+
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
     }
@@ -156,6 +160,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
   rule {
     id     = "expire-old-logs"
     status = "Enabled"
+
+    filter {
+      prefix = ""
+    }
 
     expiration {
       days = 90

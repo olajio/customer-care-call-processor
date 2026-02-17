@@ -111,7 +111,7 @@ variable "processing_lambda_timeout" {
 variable "lambda_runtime" {
   description = "Lambda runtime to use for all functions (must be supported in the target AWS region)"
   type        = string
-  default     = "python3.14"
+  default     = "python3.13"
 }
 
 variable "bedrock_lambda_memory" {
