@@ -45,7 +45,22 @@ This is a practical checklist for diagnosing the most common failures seen durin
 ### Fix (Manual packaging path)
 - Vendor dependencies into the deployment zip (less ideal for long-term maintenance).
 
-## 4) Lambda returns 500 and CloudWatch logs show DynamoDB AccessDenied
+## 4) Terraform plan/apply fails with runtime "python3.14" rejected
+
+### Symptom
+- `Error: expected runtime to be one of ... got python3.14`
+
+### Root cause
+- The Terraform AWS provider validation list may lag AWS Lambda runtime releases. Even if AWS supports `python3.14` in your region, the provider may still reject it during `plan/apply`.
+
+### Fix / Workaround
+- Use a provider-accepted runtime for Terraform (currently `python3.13`) via `var.lambda_runtime`.
+- The repo defaults Terraform to `python3.13` in `terraform/variables.tf` to keep `plan/apply` unblocked.
+- If you need to override:
+  - `terraform plan -var='lambda_runtime=python3.13' ...`
+- If you manually created Lambdas as `python3.14`, keep them as-is in AWS; Terraform-managed resources should stick to what the provider accepts until the provider adds `python3.14`.
+
+## 5) Lambda returns 500 and CloudWatch logs show DynamoDB AccessDenied
 
 ### Symptom
 - API Lambdas (e.g., list summaries) return `500`.
@@ -61,7 +76,7 @@ This is a practical checklist for diagnosing the most common failures seen durin
 
 Terraform already includes DynamoDB permissions in `terraform/iam.tf`. If the function is using a different role than Terraform expects, you’ll see this failure even though Terraform looks correct.
 
-## 5) Role name mismatch (Terraform vs manually created resources)
+## 6) Role name mismatch (Terraform vs manually created resources)
 
 ### Symptom
 - Terraform defines permissions, but Lambdas still fail with AccessDenied.
@@ -74,7 +89,7 @@ Terraform already includes DynamoDB permissions in `terraform/iam.tf`. If the fu
   - `aws lambda get-function-configuration --function-name <fn> --query Role --output text`
 - Confirm the role Terraform creates and attaches in `terraform/iam.tf` and `terraform/lambda.tf`.
 
-## 6) Smoke testing patterns (safe vs side-effect)
+## 7) Smoke testing patterns (safe vs side-effect)
 
 ### Safe smoke tests
 - `DryRun` invocation: checks wiring/permissions without executing.
@@ -86,7 +101,7 @@ Terraform already includes DynamoDB permissions in `terraform/iam.tf`. If the fu
 - Executing Step Functions pipeline.
 - Calling Bedrock.
 
-## 7) Quick AWS smoke commands
+## 8) Quick AWS smoke commands
 
 ### List your dev Lambdas
 - `aws --profile default --region us-east-1 lambda list-functions --query 'Functions[?starts_with(FunctionName, `customer-care-call-processor-`) && contains(FunctionName, `-dev`)].FunctionName' --output text`
