@@ -1,0 +1,17 @@
+{
+  "call_id": "test-call-123",
+  "s3_bucket": "REPLACE_ME_BUCKET",
+  "summary_key": "summaries/2026-02-21/test-call-123-summary.json",
+  "summary": {
+    "issue_sentence": "Test issue",
+    "key_details": ["detail1"],
+    "action_items": [],
+    "next_steps": [],
+    "sentiment": "Neutral",
+    "call_date": "2026-02-21",
+    "agent_id": null,
+    "customer_id": null,
+    "duration_seconds": 10,
+    "word_count": 6
+  }
+}

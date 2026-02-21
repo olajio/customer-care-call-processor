@@ -1,0 +1,5 @@
+{
+  "call_id": "test-call-123",
+  "s3_bucket": "REPLACE_ME_TRANSCRIBE_OUTPUT_BUCKET",
+  "transcribe_output_key": "transcripts/2026/02/21/test-call-123.json"
+}

@@ -1,0 +1,13 @@
+{
+  "requestContext": {
+    "routeKey": "$connect",
+    "connectionId": "test-connection-123",
+    "authorizer": {
+      "principalId": "test-user-123",
+      "groups": "admin"
+    }
+  },
+  "queryStringParameters": {
+    "subscribe_to": "all"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "call_id": "test-call-123",
+  "status": "COMPLETED",
+  "assigned_user_id": "test-user-123",
+  "message_type": "status_update",
+  "timestamp": "2026-02-21T00:00:00Z",
+  "data": {
+    "note": "manual console test"
+  }
+}

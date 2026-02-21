@@ -1,0 +1,19 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /summaries/{call_id}",
+  "rawPath": "/summaries/does-not-exist",
+  "pathParameters": {
+    "call_id": "does-not-exist"
+  },
+  "queryStringParameters": {
+    "include_transcript": "false"
+  },
+  "requestContext": {
+    "authorizer": {
+      "claims": {
+        "sub": "test-user-123",
+        "cognito:groups": "admin"
+      }
+    }
+  }
+}

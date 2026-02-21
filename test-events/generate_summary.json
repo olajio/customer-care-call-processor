@@ -1,0 +1,10 @@
+{
+  "call_id": "test-call-123",
+  "s3_bucket": "REPLACE_ME_BUCKET",
+  "transcript_key": "transcripts/2026-02-21/test-call-123-transcript.json",
+  "formatted_transcript": "[0:00] Agent: Hello\n\n[0:05] Customer: Hi",
+  "metadata": {
+    "total_duration_seconds": 10,
+    "word_count": 6
+  }
+}

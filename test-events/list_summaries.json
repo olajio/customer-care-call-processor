@@ -1,0 +1,15 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /summaries",
+  "rawPath": "/summaries",
+  "rawQueryString": "",
+  "queryStringParameters": null,
+  "requestContext": {
+    "authorizer": {
+      "claims": {
+        "sub": "test-user-123",
+        "cognito:groups": "admin"
+      }
+    }
+  }
+}

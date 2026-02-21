@@ -1,0 +1,7 @@
+{
+  "call_id": "test-call-123",
+  "s3_bucket": "REPLACE_ME_INPUT_BUCKET",
+  "s3_key": "raw-audio/2026/02/21/test-call-123.mp3",
+  "caller_id": "+15551234567",
+  "assigned_user_id": "test-user-123"
+}

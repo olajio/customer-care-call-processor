@@ -1,0 +1,6 @@
+{
+  "requestContext": {
+    "routeKey": "$disconnect",
+    "connectionId": "test-connection-123"
+  }
+}
