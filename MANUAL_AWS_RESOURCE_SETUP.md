@@ -3,15 +3,15 @@
 This document is a **click-by-click** guide to manually create the same AWS resources that this repo provisions with Terraform (see [terraform](terraform)).
 
 If you follow these steps exactly, you’ll end up with:
-- S3 bucket(s) for audio/transcripts/summaries
-- DynamoDB tables (3)
-- Secrets Manager secrets (Google service account JSON + webhook token)
-- IAM roles/policies (Lambda + Step Functions + optional API Gateway logging role)
-- Lambda layer + Lambda functions (11) 
-- Step Functions state machine
-- API Gateway (HTTP API + WebSocket API)
-- Cognito User Pool + Domain + App Client + Groups
-- Monitoring: CloudWatch log groups, dashboard, alarms + SNS topic
+- [S3 bucket(s) for audio/transcripts/summaries](#create-s3)
+- [DynamoDB tables (3)](#create-dynamodb)
+- [Secrets Manager secrets (Google service account JSON + webhook token)](#create-secrets)
+- [IAM roles/policies (Lambda + Step Functions + optional API Gateway logging role)](#create-iam)
+- [Lambda layer + Lambda functions (11)](#create-lambdas)
+- [Step Functions state machine](#create-step-functions)
+- [API Gateway (HTTP API + WebSocket API)](#create-api-gateway)
+- [Cognito User Pool + Domain + App Client + Groups](#create-cognito)
+- [Monitoring: CloudWatch log groups, dashboard, alarms + SNS topic](#create-monitoring)
 
 The goal is to **not assume you already know AWS Console workflows**.
 
@@ -87,6 +87,7 @@ If you want to run AWS integration tests (only after deploying resources):
 
 ---
 
+<a id="create-s3"></a>
 ## 1) Create S3 Buckets
 Source: [terraform/s3.tf](terraform/s3.tf)
 
@@ -207,6 +208,7 @@ AWS CLI smoke tests (replace values from your worksheet):
 
 ---
 
+<a id="create-dynamodb"></a>
 ## 2) Create DynamoDB Tables (3)
 Source: [terraform/dynamodb.tf](terraform/dynamodb.tf)
 
@@ -288,6 +290,7 @@ AWS CLI smoke tests:
 
 ---
 
+<a id="create-secrets"></a>
 ## 3) Create Secrets in AWS Secrets Manager
 
 Terraform expects a Google credentials secret name (default `google-drive-credentials`) and the system also needs a webhook token.
@@ -326,6 +329,7 @@ Note: you should not print secrets in logs or commit them to git.
 
 ---
 
+<a id="create-iam"></a>
 ## 4) Create IAM Roles and Policies
 Sources: [terraform/iam.tf](terraform/iam.tf), [terraform/step_functions.tf](terraform/step_functions.tf)
 
@@ -461,6 +465,7 @@ If you want a direct IAM-only check, use the IAM Policy Simulator:
 
 ---
 
+<a id="create-lambdas"></a>
 ## 5) Create the Lambda Layer + Lambda Functions
 Source: [terraform/lambda.tf](terraform/lambda.tf)
 
@@ -632,6 +637,7 @@ AWS smoke tests (after deployment):
 
 ---
 
+<a id="create-step-functions"></a>
 ## 6) Create the Step Functions State Machine
 Source: [terraform/step_functions.tf](terraform/step_functions.tf)
 
@@ -726,6 +732,7 @@ AWS CLI smoke test:
 
 ---
 
+<a id="create-cognito"></a>
 ## 7) Create Cognito (User Pool + Domain + Client + Groups)
 Source: [terraform/cognito.tf](terraform/cognito.tf)
 
@@ -796,6 +803,7 @@ If you want to call the API from curl/Postman, you’ll need a valid JWT access 
 
 ---
 
+<a id="create-api-gateway"></a>
 ## 8) Create API Gateway (HTTP API + WebSocket)
 Source: [terraform/api_gateway.tf](terraform/api_gateway.tf)
 
@@ -897,6 +905,7 @@ WebSocket smoke tests:
 
 ---
 
+<a id="create-monitoring"></a>
 ## 9) Monitoring (CloudWatch + SNS)
 Source: [terraform/cloudwatch.tf](terraform/cloudwatch.tf)
 
