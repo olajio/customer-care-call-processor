@@ -39,7 +39,7 @@ provider "aws" {
 locals {
   project_name = "customer-care-call-processor"
 
-  lambda_runtime     = "python3.11"
+  lambda_runtime     = "python3.13"
   lambda_timeout     = 30
   lambda_memory_size = 256
 

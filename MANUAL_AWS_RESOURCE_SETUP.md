@@ -104,6 +104,34 @@ Source: [terraform/s3.tf](terraform/s3.tf)
    - **Encryption type**: `SSE-S3`
 8. Click **Create bucket**.
 
+### 1.1.1 (If needed) Allow Amazon Transcribe to write output to this bucket
+This project’s `start_transcribe` Lambda starts jobs with `OutputBucketName` + `OutputKey` (see [src/lambda/processing/start_transcribe.py](src/lambda/processing/start_transcribe.py)).
+
+In most same-account setups with `SSE-S3` encryption, Transcribe can write to the output bucket without extra work. If Transcribe fails with an S3 `AccessDenied` (or the job shows failure writing output), add a bucket policy that allows the Transcribe service principal to write to your transcripts prefix.
+
+S3 → your bucket → **Permissions** → **Bucket policy** → add a statement like:
+
+```json
+{
+   "Version": "2012-10-17",
+   "Statement": [
+      {
+         "Sid": "AllowTranscribeWrite",
+         "Effect": "Allow",
+         "Principal": {"Service": "transcribe.amazonaws.com"},
+         "Action": ["s3:PutObject"],
+         "Resource": "arn:aws:s3:::<s3_bucket_name>/transcripts/*",
+         "Condition": {
+            "StringEquals": {"aws:SourceAccount": "<ACCOUNT_ID>"},
+            "ArnLike": {"aws:SourceArn": "arn:aws:transcribe:<REGION>:<ACCOUNT_ID>:transcription-job/*"}
+         }
+      }
+   ]
+}
+```
+
+If you don’t want to add a policy, an alternative is to omit `OutputBucketName` and let Transcribe write to its default output location and then fetch the result by URI; this repo currently uses `OutputBucketName`, so bucket access must be correct.
+
 ### 1.2 Configure CORS (dev only)
 1. Open the bucket → **Permissions** tab.
 2. Scroll to **Cross-origin resource sharing (CORS)** → **Edit**.
@@ -443,28 +471,30 @@ For a working Python dependency layer (recommended), you usually need the Lambda
 `python/` (contains site-packages).
 
 This guide gives you two options:
-- Option A (mirror Terraform): zip [src/lambda](src/lambda) as-is.
-- Option B (recommended for real deployments): build a dependency layer with `pip`.
+- Option A (mirror Terraform): build the same dependency layer folder Terraform expects (recommended).
+- Option B: skip layers and vendor dependencies into each function zip (not recommended for this repo).
 
-### 5.1 (Recommended) Build a dependency layer zip locally
-From repo root:
-1. Create a layer folder:
-   - `mkdir -p build/layer/python`
-2. Install required libs into it (example set for the webhook handler):
-   - `pip install -t build/layer/python google-api-python-client google-auth google-auth-httplib2 google-auth-oauthlib`
-3. Zip it:
+### 5.1 (Recommended) Build the dependency layer zip locally
+This repo already includes the canonical layer dependency list and a build script:
+- Layer deps: [requirements-layer.txt](requirements-layer.txt)
+- Build script: [scripts/build_lambda_layer.sh](scripts/build_lambda_layer.sh)
+
+From the repo root:
+1. Build the layer folder:
+   - `./scripts/build_lambda_layer.sh`
+2. Zip it (Lambda layer zips must contain a top-level `python/` directory):
    - `cd build/layer && zip -r ../../dependencies_layer.zip .`
 
 ### 5.2 Create the Lambda layer in AWS Console
 1. Go to **Lambda** → **Layers** → **Create layer**.
 2. Name: `${project_name}-dependencies-${environment}`.
-3. Upload: choose your `dependencies_layer.zip` (recommended) OR a zip of [src/lambda](src/lambda) (mirror Terraform).
-4. Compatible runtimes: select **Python 3.11**.
+3. Upload: choose your `dependencies_layer.zip`.
+4. Compatible runtimes: select **Python 3.13**.
 5. Create.
 
 ### 5.3 Create Lambda functions (11)
 All functions:
-- Runtime: **Python 3.11**
+- Runtime: **Python 3.13**
 - Execution role: `${project_name}-lambda-role-${environment}`
 - Tracing: **Active** (X-Ray)
 
@@ -472,7 +502,7 @@ Create each function:
 1. Lambda → **Functions** → **Create function**.
 2. Choose **Author from scratch**.
 3. Name: (use the names below)
-4. Runtime: **Python 3.11**
+4. Runtime: **Python 3.13**
 5. Permissions: choose **Use an existing role** → select `${project_name}-lambda-role-${environment}`.
 6. Create function.
 7. In the function page:
@@ -573,7 +603,11 @@ Functions (match Terraform names/handlers):
 - Handler: `notify.handler`
 - Timeout: 30, Memory: 256
 - Env vars: `CONNECTIONS_TABLE`, `WEBSOCKET_ENDPOINT`, `ENVIRONMENT`
-  - Set `WEBSOCKET_ENDPOINT` after you create the WebSocket API stage (it looks like `wss://.../dev`).
+   - Set `WEBSOCKET_ENDPOINT` after you create the WebSocket API stage.
+   - IMPORTANT: this Lambda uses the **API Gateway Management API** via boto3, which requires an **HTTPS** endpoint of the form:
+      - `https://{api-id}.execute-api.{region}.amazonaws.com/{stage}`
+      - (This is different from the WebSocket client URL, which is `wss://...`.)
+   - Do not set placeholders like `TBD` — boto3 will fail fast with “Invalid endpoint”.
 
 ### 5.4 Unit test + smoke test Lambda
 Local unit tests (no AWS deploy required):
@@ -779,6 +813,8 @@ Create integrations + routes
 1. In the API, go to **Routes** → **Create**.
 2. Create route `POST /webhook`.
 3. Attach integration to the webhook handler Lambda.
+   - Integration type should be **Lambda proxy** / **AWS_PROXY** (payload format `2.0`).
+   - If prompted, allow API Gateway to add `lambda:InvokeFunction` permission on the target Lambda.
 4. Create route `GET /summaries` → integration: list_summaries Lambda.
 5. Create route `GET /summaries/{call_id}` → integration: get_summary Lambda.
 
@@ -812,8 +848,9 @@ Create stage
 1. Stages → create stage `${environment}`.
 2. Auto-deploy ON.
 3. Throttling: burst 500, rate 100.
-4. Copy the stage invoke URL (wss://...).
-5. Update the `ws-notify` Lambda env var `WEBSOCKET_ENDPOINT` to this URL.
+4. Copy the stage invoke URL (client URL), which looks like `wss://.../${environment}`.
+5. Set the `ws-notify` Lambda env var `WEBSOCKET_ENDPOINT` to the **management** endpoint, which is the same URL but with `https://`:
+   - `https://<websocket-api-id>.execute-api.<region>.amazonaws.com/${environment}`
 
 ### 8.2.1 Update the Lambda execution role to allow WebSocket ManageConnections
 Now that the WebSocket API exists, go back and add this permission to `${project_name}-lambda-role-${environment}`:
@@ -1018,7 +1055,8 @@ Goal: confirm the WebSocket connection flow works end-to-end and the notify Lamb
    - Confirm `wscat` receives the message.
 
 If this fails:
-- Ensure `WEBSOCKET_ENDPOINT` env var on `ws-notify` points to the correct stage invoke URL.
+- Ensure `WEBSOCKET_ENDPOINT` env var on `ws-notify` is the **HTTPS management endpoint** (not `wss://`):
+   - `https://<websocket-api-id>.execute-api.<region>.amazonaws.com/${ENV}`
 - Ensure the Lambda execution role has `execute-api:ManageConnections` on the WebSocket API execution ARN.
 
 #### Level 5 — Full end-to-end workflow (only after Levels 1–4)
