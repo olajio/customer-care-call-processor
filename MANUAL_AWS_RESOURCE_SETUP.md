@@ -730,25 +730,296 @@ Notes:
    ` (Terraform uses the base function ARN).
 
 ### 6.2 Create the state machine
+You will create a **Standard** state machine and paste a JSON definition directly into the editor.
+
+#### 6.2.1 Collect the Lambda ARNs you’ll paste into the definition
+You need the **function ARN** (not the role ARN) for each of these:
+1. Lambda → **Functions** → open each function → copy **Function ARN**.
+2. Collect these 6 ARNs:
+    - `${project_name}-update-status-${environment}` → `REPLACE_ME_UPDATE_STATUS_LAMBDA_ARN`
+    - `${project_name}-start-transcribe-${environment}` → `REPLACE_ME_START_TRANSCRIBE_LAMBDA_ARN`
+    - `${project_name}-process-transcript-${environment}` → `REPLACE_ME_PROCESS_TRANSCRIPT_LAMBDA_ARN`
+    - `${project_name}-generate-summary-${environment}` → `REPLACE_ME_GENERATE_SUMMARY_LAMBDA_ARN`
+    - `${project_name}-save-summary-${environment}` → `REPLACE_ME_SAVE_SUMMARY_LAMBDA_ARN`
+   - `${project_name}-ws-notify-${environment}` → `REPLACE_ME_WS_NOTIFY_LAMBDA_ARN`
+
+#### 6.2.2 Create the state machine in the AWS Console
 1. Go to **Step Functions** → **State machines** → **Create state machine**.
-2. Type: **Standard**.
-3. Definition: open [stepfunctions/call-processing.asl.json](stepfunctions/call-processing.asl.json).
-4. Replace the template variables with real Lambda ARNs:
-   - `UpdateStatusFunctionArn`
-   - `StartTranscribeFunctionArn`
-   - `ProcessTranscriptFunctionArn`
-   - `GenerateSummaryFunctionArn`
-   - `SaveSummaryFunctionArn`
-   - `NotifyFunctionArn`
-5. Paste the final JSON into the definition editor.
-6. Name: `${project_name}-pipeline-${environment}`.
-7. Permissions: choose **Use an existing role** → `${project_name}-sfn-role-${environment}`.
-8. Logging:
-   - Destination: the log group you created
-   - Level: **ALL**
-   - Include execution data: **Enabled**
-9. Tracing: enable **X-Ray tracing**.
-10. Create.
+2. **Type**: **Standard**.
+3. Choose **Write your workflow in code** (or open the **Code** tab if you land in Workflow Studio).
+4. Set **Definition format** to **JSON**.
+5. Paste the definition below into the editor.
+6. Replace the 6 `REPLACE_ME_*_LAMBDA_ARN` values with your real Lambda **function ARNs** from 6.2.1.
+7. Click **Next**.
+8. **Name**: `${project_name}-pipeline-${environment}`.
+9. **Permissions**: choose **Use an existing role** → `${project_name}-sfn-role-${environment}`.
+10. **Logging**:
+    - **Log level**: **ALL**
+    - **Include execution data**: **Enabled**
+    - **CloudWatch log group**: select `/aws/step-functions/${project_name}-pipeline-${environment}`
+11. **Tracing**: enable **X-Ray tracing**.
+12. Click **Create state machine**.
+
+State machine definition (copy/paste JSON):
+
+```json
+{
+   "Comment": "Customer Care Call Processing Pipeline - Processes call recordings through transcription and AI summarization",
+   "StartAt": "UpdateStatusTranscribing",
+   "States": {
+      "UpdateStatusTranscribing": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_UPDATE_STATUS_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "status": "TRANSCRIBING"
+         },
+         "ResultPath": "$.status_update",
+         "Next": "StartTranscription"
+      },
+      "StartTranscription": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_START_TRANSCRIBE_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "s3_bucket.$": "$.s3_bucket",
+            "s3_key.$": "$.s3_key",
+            "caller_id.$": "$.caller_id",
+            "assigned_user_id.$": "$.assigned_user_id"
+         },
+         "ResultPath": "$.transcribe",
+         "Next": "WaitForTranscription",
+         "Catch": [
+            {
+               "ErrorEquals": ["States.ALL"],
+               "ResultPath": "$.error",
+               "Next": "HandleTranscriptionError"
+            }
+         ]
+      },
+      "WaitForTranscription": {
+         "Type": "Wait",
+         "Seconds": 30,
+         "Next": "CheckTranscriptionStatus"
+      },
+      "CheckTranscriptionStatus": {
+         "Type": "Task",
+         "Resource": "arn:aws:states:::aws-sdk:transcribe:getTranscriptionJob",
+         "Parameters": {
+            "TranscriptionJobName.$": "$.transcribe.transcribe_job_name"
+         },
+         "ResultPath": "$.transcribe_status",
+         "Next": "IsTranscriptionComplete"
+      },
+      "IsTranscriptionComplete": {
+         "Type": "Choice",
+         "Choices": [
+            {
+               "Variable": "$.transcribe_status.TranscriptionJob.TranscriptionJobStatus",
+               "StringEquals": "COMPLETED",
+               "Next": "NotifyTranscriptionComplete"
+            },
+            {
+               "Variable": "$.transcribe_status.TranscriptionJob.TranscriptionJobStatus",
+               "StringEquals": "FAILED",
+               "Next": "HandleTranscriptionError"
+            }
+         ],
+         "Default": "WaitForTranscription"
+      },
+      "NotifyTranscriptionComplete": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_WS_NOTIFY_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "status": "TRANSCRIBING",
+            "assigned_user_id.$": "$.assigned_user_id",
+            "message_type": "status_update",
+            "data": {
+               "stage": "transcription_complete"
+            }
+         },
+         "ResultPath": "$.notification",
+         "Next": "ProcessTranscript"
+      },
+      "ProcessTranscript": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_PROCESS_TRANSCRIPT_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "transcribe_output_bucket.$": "$.transcribe.transcribe_output_bucket",
+            "transcribe_output_key.$": "$.transcribe.transcribe_output_key",
+            "assigned_user_id.$": "$.assigned_user_id"
+         },
+         "ResultPath": "$.transcript",
+         "Next": "UpdateStatusSummarizing",
+         "Catch": [
+            {
+               "ErrorEquals": ["States.ALL"],
+               "ResultPath": "$.error",
+               "Next": "HandleProcessingError"
+            }
+         ]
+      },
+      "UpdateStatusSummarizing": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_UPDATE_STATUS_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "status": "SUMMARIZING"
+         },
+         "ResultPath": "$.status_update",
+         "Next": "NotifySummarizing"
+      },
+      "NotifySummarizing": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_WS_NOTIFY_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "status": "SUMMARIZING",
+            "assigned_user_id.$": "$.assigned_user_id",
+            "message_type": "status_update"
+         },
+         "ResultPath": "$.notification",
+         "Next": "GenerateSummary"
+      },
+      "GenerateSummary": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_GENERATE_SUMMARY_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "transcript_text.$": "$.transcript.transcript_text",
+            "transcript_s3_key.$": "$.transcript.transcript_s3_key",
+            "assigned_user_id.$": "$.assigned_user_id"
+         },
+         "ResultPath": "$.summary",
+         "Next": "SaveSummary",
+         "Catch": [
+            {
+               "ErrorEquals": ["States.ALL"],
+               "ResultPath": "$.error",
+               "Next": "HandleSummarizationError"
+            }
+         ],
+         "Retry": [
+            {
+               "ErrorEquals": ["ThrottlingException", "ServiceUnavailableException"],
+               "IntervalSeconds": 5,
+               "MaxAttempts": 3,
+               "BackoffRate": 2
+            }
+         ]
+      },
+      "SaveSummary": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_SAVE_SUMMARY_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "summary.$": "$.summary.summary",
+            "key_points.$": "$.summary.key_points",
+            "action_items.$": "$.summary.action_items",
+            "sentiment.$": "$.summary.sentiment",
+            "urgency.$": "$.summary.urgency",
+            "categories.$": "$.summary.categories",
+            "transcript_s3_key.$": "$.transcript.transcript_s3_key"
+         },
+         "ResultPath": "$.save_result",
+         "Next": "NotifyComplete",
+         "Catch": [
+            {
+               "ErrorEquals": ["States.ALL"],
+               "ResultPath": "$.error",
+               "Next": "HandleSaveError"
+            }
+         ]
+      },
+      "NotifyComplete": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_WS_NOTIFY_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "status": "COMPLETED",
+            "assigned_user_id.$": "$.assigned_user_id",
+            "message_type": "processing_complete",
+            "data": {
+               "summary.$": "$.summary.summary",
+               "sentiment.$": "$.summary.sentiment",
+               "urgency.$": "$.summary.urgency"
+            }
+         },
+         "ResultPath": "$.notification",
+         "Next": "ProcessingComplete"
+      },
+      "ProcessingComplete": {
+         "Type": "Succeed"
+      },
+      "HandleTranscriptionError": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_UPDATE_STATUS_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "status": "FAILED",
+            "error_message": "Transcription failed"
+         },
+         "ResultPath": "$.status_update",
+         "Next": "NotifyError"
+      },
+      "HandleProcessingError": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_UPDATE_STATUS_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "status": "FAILED",
+            "error_message": "Transcript processing failed"
+         },
+         "ResultPath": "$.status_update",
+         "Next": "NotifyError"
+      },
+      "HandleSummarizationError": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_UPDATE_STATUS_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "status": "FAILED",
+            "error_message": "AI summarization failed"
+         },
+         "ResultPath": "$.status_update",
+         "Next": "NotifyError"
+      },
+      "HandleSaveError": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_UPDATE_STATUS_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "status": "FAILED",
+            "error_message": "Failed to save summary"
+         },
+         "ResultPath": "$.status_update",
+         "Next": "NotifyError"
+      },
+      "NotifyError": {
+         "Type": "Task",
+         "Resource": "REPLACE_ME_WS_NOTIFY_LAMBDA_ARN",
+         "Parameters": {
+            "call_id.$": "$.call_id",
+            "status": "FAILED",
+            "assigned_user_id.$": "$.assigned_user_id",
+            "message_type": "processing_error",
+            "data": {
+               "error.$": "$.error"
+            }
+         },
+         "ResultPath": "$.notification",
+         "Next": "ProcessingFailed"
+      },
+      "ProcessingFailed": {
+         "Type": "Fail",
+         "Error": "ProcessingError",
+         "Cause": "Call processing pipeline failed"
+      }
+   }
+}
+```
 
 ### 6.3 Update Lambda environment variables that depend on Step Functions
 Go back to the webhook handler Lambda and set:
