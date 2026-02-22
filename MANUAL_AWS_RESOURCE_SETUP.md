@@ -760,6 +760,11 @@ You need the **function ARN** (not the role ARN) for each of these:
 11. **Tracing**: enable **X-Ray tracing**.
 12. Click **Create state machine**.
 
+Troubleshooting (common pitfall):
+- If you see an error like `not authorized to perform: transcribe:GetTranscriptionJob`, it means the **state machine execution role** does not include `transcribe:GetTranscriptionJob`.
+- This usually happens if you accidentally let Step Functions create an auto-generated role (often named like `StepFunctions-<name>-role-<random>`) instead of selecting `${project_name}-sfn-role-${environment}`.
+- Fix: open the state machine → **Permissions** → confirm the **Execution role** is `${project_name}-sfn-role-${environment}`. If it isn’t, change it (or add `transcribe:GetTranscriptionJob` to the role you actually used).
+
 State machine definition (copy/paste JSON):
 
 ```json
