@@ -651,12 +651,83 @@ Source: [terraform/step_functions.tf](terraform/step_functions.tf)
 You created the role in Section 4.2, but you delayed the policy until the Lambdas existed.
 
 1. IAM → Roles → open `${project_name}-sfn-role-${environment}`.
-2. Permissions → **Add permissions** → **Create inline policy** → JSON.
-3. Use the JSON shape from [terraform/step_functions.tf](terraform/step_functions.tf) and replace placeholders with your real ARNs:
-   - The 6 pipeline Lambda ARNs you pasted into the state machine definition
-   - The Step Functions log group ARN for `/aws/step-functions/${project_name}-pipeline-${environment}`
-4. Policy name: `${project_name}-sfn-policy-${environment}`.
-5. Create.
+2. Go to **Permissions** → **Add permissions** → **Create inline policy**.
+3. Select the **JSON** tab.
+
+4. Collect the 6 Lambda **function ARNs** (you’ll paste them into the policy below):
+    - Lambda → Functions → open each function → copy the **Function ARN** from the top-right.
+    - You need these functions:
+       - `${project_name}-update-status-${environment}`
+       - `${project_name}-start-transcribe-${environment}`
+       - `${project_name}-process-transcript-${environment}`
+       - `${project_name}-generate-summary-${environment}`
+       - `${project_name}-save-summary-${environment}`
+       - `${project_name}-ws-notify-${environment}`
+
+5. Paste this policy JSON and replace the 6 `REPLACE_ME_*_LAMBDA_ARN` values.
+    - This is the exact permission set Terraform grants to the Step Functions role for this project.
+
+```json
+{
+   "Version": "2012-10-17",
+   "Statement": [
+      {
+         "Sid": "InvokePipelineLambdas",
+         "Effect": "Allow",
+         "Action": ["lambda:InvokeFunction"],
+         "Resource": [
+            "REPLACE_ME_UPDATE_STATUS_LAMBDA_ARN",
+            "REPLACE_ME_START_TRANSCRIBE_LAMBDA_ARN",
+            "REPLACE_ME_PROCESS_TRANSCRIPT_LAMBDA_ARN",
+            "REPLACE_ME_GENERATE_SUMMARY_LAMBDA_ARN",
+            "REPLACE_ME_SAVE_SUMMARY_LAMBDA_ARN",
+            "REPLACE_ME_WS_NOTIFY_LAMBDA_ARN"
+         ]
+      },
+      {
+         "Sid": "ReadTranscribeJobStatus",
+         "Effect": "Allow",
+         "Action": ["transcribe:GetTranscriptionJob"],
+         "Resource": "*"
+      },
+      {
+         "Sid": "StepFunctionsLoggingDelivery",
+         "Effect": "Allow",
+         "Action": [
+            "logs:CreateLogDelivery",
+            "logs:GetLogDelivery",
+            "logs:UpdateLogDelivery",
+            "logs:DeleteLogDelivery",
+            "logs:ListLogDeliveries",
+            "logs:PutResourcePolicy",
+            "logs:DescribeResourcePolicies",
+            "logs:DescribeLogGroups"
+         ],
+         "Resource": "*"
+      },
+      {
+         "Sid": "XRayTracing",
+         "Effect": "Allow",
+         "Action": [
+            "xray:PutTraceSegments",
+            "xray:PutTelemetryRecords",
+            "xray:GetSamplingRules",
+            "xray:GetSamplingTargets"
+         ],
+         "Resource": "*"
+      }
+   ]
+}
+```
+
+6. Click **Next**.
+7. Policy name: `${project_name}-sfn-policy-${environment}`.
+8. Click **Create policy**.
+
+Notes:
+- You do not need to reference the Step Functions log group ARN inside this policy; Step Functions logging uses the CloudWatch Logs “log delivery” permissions above.
+- If your state machine definition invokes Lambda **versions/aliases**, you may need to broaden the Lambda `Resource` entries to include `:<alias>` or add `:*
+   ` (Terraform uses the base function ARN).
 
 ### 6.2 Create the state machine
 1. Go to **Step Functions** → **State machines** → **Create state machine**.
