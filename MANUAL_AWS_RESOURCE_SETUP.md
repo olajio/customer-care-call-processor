@@ -1185,8 +1185,65 @@ Create JWT authorizer (Cognito)
 Stage + logging
 1. Go to **Stages** → create stage named `${environment}`.
 2. Enable auto-deploy.
-3. Access logs: create/use log group `/aws/apigateway/${project_name}-${environment}` and enable logging.
-4. Throttling: burst 100, rate 50.
+3. Throttling: burst 100, rate 50.
+4. Access logs (CloudWatch) + log format
+    - Create/use log group: `/aws/apigateway/${project_name}-${environment}`
+    - Then configure **Stage access logs** with a JSON log format.
+
+Console steps (recommended)
+1. Go to **CloudWatch** → **Logs** → **Log groups** → **Create log group**.
+2. Name: `/aws/apigateway/${project_name}-${environment}`.
+3. (Recommended) Set retention to `30 days`.
+4. Go back to **API Gateway** → your HTTP API → **Stages** → `${environment}`.
+5. Find **Logs and tracing** (or **Access logging**) → enable **Access logging**.
+6. **Log destination**: select the log group `/aws/apigateway/${project_name}-${environment}`.
+7. **Log format**: paste this JSON format string:
+
+```json
+{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","routeKey":"$context.routeKey","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength","integrationError":"$context.integrationErrorMessage"}
+```
+
+AWS CLI (optional)
+```bash
+REGION=us-east-1
+PROJECT_NAME=customer-care-call-processor
+ENV=dev
+HTTP_API_ID=<http-api-id>
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# Ensure log group exists
+aws --region "$REGION" logs create-log-group \
+   --log-group-name "/aws/apigateway/${PROJECT_NAME}-${ENV}" 2>/dev/null || true
+
+# (Recommended) retention
+aws --region "$REGION" logs put-retention-policy \
+   --log-group-name "/aws/apigateway/${PROJECT_NAME}-${ENV}" \
+   --retention-in-days 30
+
+# Enable access logs on the stage (use --cli-input-json to avoid AWS CLI parsing issues)
+DESTINATION_ARN="arn:aws:logs:${REGION}:${ACCOUNT_ID}:log-group:/aws/apigateway/${PROJECT_NAME}-${ENV}"
+LOG_FORMAT='{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","routeKey":"$context.routeKey","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength","integrationError":"$context.integrationErrorMessage"}'
+
+aws --region "$REGION" apigatewayv2 update-stage --cli-input-json "$(python3 - <<PY
+import json
+
+payload = {
+   "ApiId": "${HTTP_API_ID}",
+   "StageName": "${ENV}",
+   "AccessLogSettings": {
+      "DestinationArn": "${DESTINATION_ARN}",
+      "Format": r'''${LOG_FORMAT}''',
+   }
+}
+
+print(json.dumps(payload))
+PY
+)"
+```
+
+Notes
+- The **destination ARN** is the **log group ARN** (not a log stream).
+- If you see AWS CLI parsing errors when setting `Format`, prefer `--cli-input-json` as shown above.
 
 ### 8.2 WebSocket API (for real-time notifications)
 1. API Gateway → **Create API**.
@@ -1203,8 +1260,11 @@ Create stage
 1. Stages → create stage `${environment}`.
 2. Auto-deploy ON.
 3. Throttling: burst 500, rate 100.
-4. Copy the stage invoke URL (client URL), which looks like `wss://.../${environment}`.
-5. Set the `ws-notify` Lambda env var `WEBSOCKET_ENDPOINT` to the **management** endpoint, which is the same URL but with `https://`:
+4. (Optional) Access logs + log format
+   - WebSocket APIs also support stage access logs.
+   - Use the same log group `/aws/apigateway/${project_name}-${environment}` and the same JSON log format string as in Section 8.1.
+5. Copy the stage invoke URL (client URL), which looks like `wss://.../${environment}`.
+6. Set the `ws-notify` Lambda env var `WEBSOCKET_ENDPOINT` to the **management** endpoint, which is the same URL but with `https://`:
    - `https://<websocket-api-id>.execute-api.<region>.amazonaws.com/${environment}`
 
 ### 8.2.1 Update the Lambda execution role to allow WebSocket ManageConnections
